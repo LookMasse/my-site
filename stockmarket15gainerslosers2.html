@@ -1,3 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live US Stock Movers – Top 15 Gainers &amp; Losers</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card: #111827;
+      --border: #1f2937;
+      --text: #f9fafb;
+      --muted: #9ca3af;
+      --accent: #38bdf8;
+      --green: #10b981;
+      --green-bg: rgba(16, 185, 129, 0.15);
+      --red: #ef4444;
+      --red-bg: rgba(239, 68, 68, 0.15);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 20px;
+      line-height: 1.4;
+    }
+    header {
+      max-width: 1400px;
+      margin: 0 auto 18px auto;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .title-group h1 { font-size: 1.45rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); display: inline-block; box-shadow: 0 0 8px var(--green); }
+    .subtitle { color: var(--muted); font-size: 0.86rem; margin-top: 4px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    select, input {
+      background: var(--card); border: 1px solid var(--border); color: var(--text);
+      padding: 8px 12px; border-radius: 6px; font-size: 0.88rem;
+    }
+    button {
+      background: var(--accent); color: #090d16; border: none;
+      padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 0.88rem; cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+    .status-bar {
+      max-width: 1400px; margin: 0 auto 18px auto; font-size: 0.83rem; color: var(--muted);
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    }
+    .grid { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+    @media (max-width: 1050px) { .grid { grid-template-columns: 1fr; } }
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; }
+    .panel-header {
+      padding: 14px 18px; background: rgba(9, 13, 22, 0.6); border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .panel-header h2 { font-size: 1.05rem; font-weight: 600; }
+    .gainer-title { color: var(--green); }
+    .loser-title { color: var(--red); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { color: var(--muted); font-weight: 600; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    th.num, td.num { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    tr:last-child td { border-bottom: none; }
+    .rank { color: var(--muted); width: 32px; }
+    .ticker { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: var(--accent); }
+    .company { color: var(--muted); font-size: 0.8rem; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-weight: 600; font-size: 0.78rem; }
+    .pill-gain { background: var(--green-bg); color: var(--green); }
+    .pill-loss { background: var(--red-bg); color: var(--red); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="title-group">
+      <h1>
+        <span class="live-dot"></span>
+        <span>Live US Stock Market Movers</span>
+      </h1>
+      <div class="subtitle">Real-time Top 15 Day Gainers &amp; Top 15 Day Losers (Auto-refreshes every 60s)</div>
+    </div>
+
+    <div class="controls">
+      <select id="sourceSelect">
+        <option value="auto">Source: Yahoo Finance + Finviz (No Key)</option>
+        <option value="fmp">Source: Financial Modeling Prep (Free Key)</option>
+      </select>
+      <input type="text" id="fmpKeyInput" placeholder="Paste your FMP API Key..." style="display:none;" />
+      <button id="refreshBtn">Update Live Quotes</button>
+    </div>
+  </header>
+
+  <div class="status-bar">
+    <span id="statusText">Connecting to live market feed...</span>
+    <span id="lastUpdated">Last updated: --:--:--</span>
+  </div>
+
+  <main class="grid">
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="gainer-title">Top 15 Day Gainers</h2>
+        <span style="color: var(--muted); font-size: 0.78rem;">Intraday USD</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th class="rank">#</th>
+            <th>Symbol</th>
+            <th>Company</th>
+            <th class="num">Price</th>
+            <th class="num">Change</th>
+            <th class="num">% Chg</th>
+            <th class="num">Volume</th>
+          </tr>
+        </thead>
+        <tbody id="gainersBody">
+          <tr><td colspan="7">Fetching live gainers...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="loser-title">Top 15 Day Losers</h2>
+        <span style="color: var(--muted); font-size: 0.78rem;">Intraday USD</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th class="rank">#</th>
+            <th>Symbol</th>
+            <th>Company</th>
+            <th class="num">Price</th>
+            <th class="num">Change</th>
+            <th class="num">% Chg</th>
+            <th class="num">Volume</th>
+          </tr>
+        </thead>
+        <tbody id="losersBody">
+          <tr><td colspan="7">Fetching live losers...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
   <script>
     const REFRESH_MS = 60000;
     const sourceSelect = document.getElementById("sourceSelect");
@@ -63,13 +214,9 @@
     }
 
     async function fetchTextViaProxies(targetUrl) {
-      const u1 = new URL("https://allorigins.win");
-      u1.searchParams.set("url", targetUrl);
-
-      const u2 = new URL("https://codetabs.com");
-      u2.searchParams.set("quest", targetUrl);
-
-      const proxyUrls = Array.of(u1.toString(), u2.toString());
+      const p1 = "https://allorigins.win" + "/get?url=" + encodeURIComponent(targetUrl);
+      const p2 = "https://codetabs.com" + "/v1/proxy?quest=" + encodeURIComponent(targetUrl);
+      const proxyUrls = Array.of(p1, p2);
       let lastErr;
 
       for (const proxyUrl of proxyUrls) {
@@ -95,6 +242,7 @@
       }
       throw lastErr || new Error("Proxy connection failed");
     }
+
     function parseYahooHtml(htmlString) {
       const doc = new DOMParser().parseFromString(htmlString, "text/html");
       const rows = Array.from(doc.querySelectorAll("table tr"));
@@ -103,15 +251,11 @@
       for (const tr of rows) {
         const cells = Array.from(tr.querySelectorAll("td"));
         if (cells.length < 5) continue;
-
         const rawSym = (cells.at(0).textContent || "").trim().split(/\s+/).at(0);
         if (!rawSym || !/^[A-Z]{1,5}(\.[A-Z])?$/.test(rawSym)) continue;
 
         const nameText = (cells.at(1).textContent || "").trim();
-        let priceVal = 0;
-        let chgVal = 0;
-        let pctVal = 0;
-        let volText = "--";
+        let priceVal = 0, chgVal = 0, pctVal = 0, volText = "--";
 
         for (let idx = 2; idx < cells.length; idx++) {
           const txt = (cells.at(idx).textContent || "").trim();
@@ -128,14 +272,7 @@
 
         if (priceVal > 0 && pctVal !== 0) {
           if (!chgVal) chgVal = priceVal - (priceVal / (1 + pctVal / 100));
-          items.push({
-            symbol: rawSym,
-            name: nameText || rawSym,
-            price: priceVal,
-            change: chgVal,
-            percentChange: pctVal,
-            volume: volText
-          });
+          items.push({ symbol: rawSym, name: nameText || rawSym, price: priceVal, change: chgVal, percentChange: pctVal, volume: volText });
         }
         if (items.length >= 15) break;
       }
@@ -155,23 +292,13 @@
         if (!/^\d+$/.test(rankTxt) || !/^[A-Z]{1,5}$/.test(symTxt)) continue;
 
         const nameTxt = (cells.at(2).textContent || "").trim();
-        const priceTxt = (cells.at(8).textContent || "").trim();
-        const pctTxt = (cells.at(9).textContent || "").trim();
+        const priceVal = parseNum(cells.at(8).textContent);
+        const pctVal = parseNum(cells.at(9).textContent);
         const volTxt = (cells.at(10) ? cells.at(10).textContent : "--").trim();
-
-        const priceVal = parseNum(priceTxt);
-        const pctVal = parseNum(pctTxt);
         const chgVal = priceVal ? priceVal - (priceVal / (1 + pctVal / 100)) : 0;
 
         if (priceVal > 0) {
-          items.push({
-            symbol: symTxt,
-            name: nameTxt || symTxt,
-            price: priceVal,
-            change: chgVal,
-            percentChange: pctVal,
-            volume: volTxt
-          });
+          items.push({ symbol: symTxt, name: nameTxt || symTxt, price: priceVal, change: chgVal, percentChange: pctVal, volume: volTxt });
         }
         if (items.length >= 15) break;
       }
@@ -179,43 +306,43 @@
     }
 
     async function fetchFromYahoo() {
+      const base = "https://yahoo.com";
       const pair = await Promise.all(Array.of(
-        fetchTextViaProxies("https://yahoo.com"),
-        fetchTextViaProxies("https://yahoo.com")
+        fetchTextViaProxies(base + "/markets/stocks/gainers/"),
+        fetchTextViaProxies(base + "/markets/stocks/losers/")
       ));
       const gainers = parseYahooHtml(pair.at(0));
       const losers = parseYahooHtml(pair.at(1));
-      if (!gainers.length && !losers.length) throw new Error("Yahoo layout blocked");
+      if (!gainers.length && !losers.length) throw new Error("Yahoo layout unavailable");
       return { gainers: gainers, losers: losers, label: "Live feed: Yahoo Finance US Markets" };
     }
 
     async function fetchFromFinviz() {
-      const gUrl = "https://finviz.com";
-      const lUrl = "https://finviz.com";
-      const pair = await Promise.all(Array.of(fetchTextViaProxies(gUrl), fetchTextViaProxies(lUrl)));
+      const base = "https://finviz.com";
+      const pair = await Promise.all(Array.of(
+        fetchTextViaProxies(base + "/screener.ashx?v=111&s=ta_topgainers&f=sh_price_o1,sh_curvol_o100"),
+        fetchTextViaProxies(base + "/screener.ashx?v=111&s=ta_toplosers&f=sh_price_o1,sh_curvol_o100")
+      ));
       const gainers = parseFinvizHtml(pair.at(0));
       const losers = parseFinvizHtml(pair.at(1));
       if (!gainers.length && !losers.length) throw new Error("Finviz screener unavailable");
-      return { gainers: gainers, losers: losers, label: "Live feed: US Intraday Screener (NYSE / NASDAQ)" };
+      return { gainers: gainers, losers: losers, label: "Live feed: Finviz US Intraday Screener" };
     }
 
     async function fetchFromFMP() {
       const key = fmpKeyInput.value.trim();
       if (!key) throw new Error("Enter your free Financial Modeling Prep API key");
       localStorage.setItem("fmp_api_key", key);
-      const gUrl = new URL("https://financialmodelingprep.com");
-      gUrl.searchParams.set("apikey", key);
-      const lUrl = new URL("https://financialmodelingprep.com");
-      lUrl.searchParams.set("apikey", key);
-      const pair = await Promise.all(Array.of(fetch(gUrl.toString()), fetch(lUrl.toString())));
+      const base = "https://financialmodelingprep.com";
+      const pair = await Promise.all(Array.of(
+        fetch(base + "/stable/biggest-gainers?apikey=" + encodeURIComponent(key)),
+        fetch(base + "/stable/biggest-losers?apikey=" + encodeURIComponent(key))
+      ));
       const gJson = await pair.at(0).json();
       const lJson = await pair.at(1).json();
-      if (gJson["Error Message"] || lJson["Error Message"]) {
-        throw new Error(gJson["Error Message"] || lJson["Error Message"]);
-      }
+      if (gJson["Error Message"] || lJson["Error Message"]) throw new Error(gJson["Error Message"] || lJson["Error Message"]);
       const mapFmp = arr => (Array.isArray(arr) ? arr : Array.of()).map(item => ({
-        symbol: item.symbol, name: item.name, price: item.price,
-        change: item.change, percentChange: item.changesPercentage, volume: item.volume || 0
+        symbol: item.symbol, name: item.name, price: item.price, change: item.change, percentChange: item.changesPercentage, volume: item.volume || 0
       }));
       return { gainers: mapFmp(gJson), losers: mapFmp(lJson), label: "Live feed: Financial Modeling Prep (FMP)" };
     }
@@ -230,7 +357,7 @@
         } else {
           try {
             result = await fetchFromYahoo();
-          } catch (yahooErr) {
+          } catch (e) {
             result = await fetchFromFinviz();
           }
         }
