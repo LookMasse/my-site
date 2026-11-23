@@ -4,35 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Live US Stock Movers – NYSE, NASDAQ &amp; S&amp;P 500 ($5+)</title>
-      .ticker-btn {
-      background: none; border: none; padding: 2px 5px; margin: -2px -5px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-weight: 700; font-size: 0.86rem; color: var(--accent);
-      cursor: pointer; border-radius: 4px; text-decoration: underline;
-    }
-    .ticker-btn:hover { background: rgba(56, 189, 248, 0.15); }
-    .modal-backdrop {
-      display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.78);
-      z-index: 1000; align-items: center; justify-content: center; padding: 16px;
-    }
-    .modal-backdrop.open { display: flex; }
-    .modal-card {
-      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-      width: 100%; max-width: 760px; overflow: hidden;
-    }
-    .modal-top, .modal-footer {
-      padding: 14px 18px; border-bottom: 1px solid var(--border);
-      display: flex; justify-content: space-between; align-items: center; gap: 10px;
-    }
-    .modal-footer { border-bottom: none; border-top: 1px solid var(--border); }
-    .modal-body { padding: 18px; }
-    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
-    .stat-box { background: rgba(9, 13, 22, 0.55); border: 1px solid var(--border); padding: 10px; border-radius: 8px; }
-    .stat-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; }
-    .stat-val { font-size: 1rem; font-weight: 700; font-family: monospace; margin-top: 3px; }
-    .chart-wrap { background: rgba(9, 13, 22, 0.45); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
-    .ext-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600; }
-
   <style>
     :root {
       --bg: #090d16;
@@ -110,13 +81,41 @@
     th.num, td.num { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     tr:last-child td { border-bottom: none; }
     .rank { color: var(--muted); width: 30px; }
-    .ticker { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: var(--accent); }
-    .exch-tag { font-size: 0.68rem; color: var(--muted); margin-left: 4px; }
+    .ticker {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 700; color: var(--accent); cursor: pointer;
+      text-decoration: underline; text-decoration-color: rgba(56, 189, 248, 0.45);
+    }
+    .ticker:hover { color: #7dd3fc; }
+    .exch-tag { font-size: 0.68rem; color: var(--muted); margin-left: 5px; }
     .company { color: var(--muted); font-size: 0.78rem; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
     .after-hrs { color: var(--amber); font-size: 0.82rem; }
     .pill { display: inline-block; padding: 2px 7px; border-radius: 999px; font-weight: 600; font-size: 0.76rem; }
     .pill-gain { background: var(--green-bg); color: var(--green); }
     .pill-loss { background: var(--red-bg); color: var(--red); }
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.78);
+      z-index: 1000; align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      width: 100%; max-width: 760px; overflow: hidden; box-shadow: 0 20px 45px rgba(0,0,0,0.6);
+    }
+    .modal-top, .modal-footer {
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    }
+    .modal-footer { border-bottom: none; border-top: 1px solid var(--border); }
+    .modal-body { padding: 18px; }
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+    @media (max-width: 600px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+    .stat-box { background: rgba(9, 13, 22, 0.55); border: 1px solid var(--border); padding: 10px; border-radius: 8px; }
+    .stat-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; }
+    .stat-val { font-size: 1rem; font-weight: 700; font-family: monospace; margin-top: 3px; }
+    .chart-wrap { background: rgba(9, 13, 22, 0.45); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+    .ext-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600; }
+    .ext-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -127,13 +126,13 @@
         <span class="live-dot"></span>
         <span>Live US Stock Movers ($5.00+ Only)</span>
       </h1>
-      <div class="subtitle">Top 50 Gainers &amp; Losers across NYSE, NASDAQ &amp; S&amp;P 500 (Click any column header to sort)</div>
+      <div class="subtitle">Click any symbol for a 7-day chart &amp; stats • Click column headers to sort</div>
     </div>
 
     <div class="controls">
       <select id="marketFilter">
         <option value="nyse_nasdaq">NYSE + NASDAQ ($5.00+)</option>
-        <option value="sp500">S&amp;P 500 Only (All 500 Stocks)</option>
+        <option value="sp500">S&amp;P 500 Only</option>
       </select>
       <input type="password" id="fmpKeyInput" placeholder="Paste your FMP API Key..." />
       <button id="toggleKeyBtn" class="secondary" style="display:none;">Change Key</button>
@@ -195,7 +194,8 @@
       </table>
     </section>
   </main>
-    <div id="stockModal" class="modal-backdrop">
+
+  <div id="stockModal" class="modal-backdrop">
     <div class="modal-card">
       <div class="modal-top">
         <div>
@@ -222,7 +222,6 @@
       </div>
     </div>
   </div>
-
   <script>
     const REFRESH_MS = 900000;
     const MIN_PRICE = 5.00;
@@ -359,7 +358,6 @@
         `;
       }).join("");
     }
-
     function bindHeaderSorting(headerRowId, side) {
       const row = document.getElementById(headerRowId);
       if (!row) return;
@@ -380,44 +378,6 @@
 
     bindHeaderSorting("gainersHeader", "gainers");
     bindHeaderSorting("losersHeader", "losers");
-    async function fetchAllSp500Quotes(key) {
-      const base = "https://financialmodelingprep.com";
-      const chunkSize = 100;
-      const chunks = Array.of();
-      for (let i = 0; i < SP500_TICKERS.length; i += chunkSize) {
-        chunks.push(SP500_TICKERS.slice(i, i + chunkSize));
-      }
-
-      const responses = await Promise.all(
-        chunks.map(group =>
-          fetch(base + "/stable/batch-quote?symbols=" + encodeURIComponent(group.join(",")) + "&apikey=" + encodeURIComponent(key))
-            .then(r => r.json())
-        )
-      );
-
-      const allQuotes = Array.of();
-      for (const batch of responses) {
-        if (batch && batch["Error Message"]) throw new Error(batch["Error Message"]);
-        if (Array.isArray(batch)) {
-          for (const q of batch) {
-            const price = parseNum(q.price);
-            if (price >= MIN_PRICE) {
-              allQuotes.push({
-                symbol: String(q.symbol || "").toUpperCase(),
-                name: q.name || q.symbol,
-                exchange: q.exchange || "S&P 500",
-                price: price,
-                afterHours: parseNum(q.postMarketPrice || q.preMarketPrice || 0),
-                change: parseNum(q.change),
-                percentChange: parseNum(q.changesPercentage),
-                volume: parseNum(q.volume)
-              });
-            }
-          }
-        }
-      }
-      return allQuotes;
-    }
 
     async function safeFetchJson(url) {
       const res = await fetch(url);
@@ -432,107 +392,7 @@
       return data;
     }
 
-    async function fetchNyseNasdaqMovers(key) {
-      const base = "https://financialmodelingprep.com";
-      const k = encodeURIComponent(key);
-
-      // Fetch gainers, losers, and most-active stocks (all included in FMP free tier)
-      const results = await Promise.allSettled(Array.of(
-        safeFetchJson(base + "/stable/biggest-gainers?apikey=" + k),
-        safeFetchJson(base + "/stable/biggest-losers?apikey=" + k),
-        safeFetchJson(base + "/stable/most-actives?apikey=" + k)
-      ));
-
-      const gRes = results.at(0).status === "fulfilled" ? results.at(0).value : Array.of();
-      const lRes = results.at(1).status === "fulfilled" ? results.at(1).value : Array.of();
-      const aRes = results.at(2).status === "fulfilled" ? results.at(2).value : Array.of();
-
-      if (!gRes.length && !lRes.length) {
-        const firstErr = results.at(0).reason || results.at(1).reason;
-        throw new Error(firstErr ? firstErr.message : "No mover data returned from FMP");
-      }
-
-      const bySymbol = new Map();
-      const addList = arr => {
-        if (!Array.isArray(arr)) return;
-        for (const item of arr) {
-          const sym = String(item.symbol || "").toUpperCase();
-          const price = parseNum(item.price);
-          const exch = item.exchangeShortName || item.exchange || "";
-          if (sym && price >= MIN_PRICE && isAllowedExchange(exch) && !bySymbol.has(sym)) {
-            bySymbol.set(sym, {
-              symbol: sym,
-              name: item.name || sym,
-              exchange: exch || (SP500_SET.has(sym) ? "S&P 500" : ""),
-              price: price,
-              afterHours: parseNum(item.postMarketPrice || item.preMarketPrice || 0),
-              change: parseNum(item.change),
-              percentChange: parseNum(item.changesPercentage),
-              volume: parseNum(item.volume)
-            });
-          }
-        }
-      };
-
-      addList(gRes);
-      addList(lRes);
-      addList(aRes);
-
-      return Array.from(bySymbol.values());
-    }
-
-    async function fetchLiveMovers() {
-      const now = new Date();
-      const key = fmpKeyInput.value.trim();
-
-      if (!key) {
-        statusText.textContent = "Please paste your Financial Modeling Prep API key above and click Update Quotes.";
-        gainersBody.innerHTML = '<tr><td colspan="8" style="color: var(--muted);">Waiting for API key...</td></tr>';
-        losersBody.innerHTML = '<tr><td colspan="8" style="color: var(--muted);">Waiting for API key...</td></tr>';
-        return;
-      }
-
-      localStorage.setItem("fmp_api_key", key);
-      updateKeyVisibility();
-
-      const useSp500Only = marketFilter.value === "sp500";
-      statusText.textContent = "Fetching live US market movers ($5.00+)...";
-
-      try {
-        let pool = await fetchNyseNasdaqMovers(key);
-
-        if (useSp500Only) {
-          pool = pool.filter(x => SP500_SET.has(x.symbol));
-        }
-
-        currentGainers = pool
-          .filter(x => x.percentChange > 0)
-          .sort((a, b) => b.percentChange - a.percentChange)
-          .slice(0, MAX_ITEMS);
-
-        currentLosers = pool
-          .filter(x => x.percentChange < 0)
-          .sort((a, b) => a.percentChange - b.percentChange)
-          .slice(0, MAX_ITEMS);
-
-        renderTable("gainers");
-        renderTable("losers");
-
-        const scopeLabel = useSp500Only ? "S&P 500 Filter" : "NYSE + NASDAQ (incl. S&P 500)";
-        statusText.textContent = `Live feed: ${scopeLabel} — ${currentGainers.length} Gainers, ${currentLosers.length} Losers ($5.00+)`;
-      } catch (err) {
-        statusText.textContent = "Feed error: " + err.message;
-        gainersBody.innerHTML = '<tr><td colspan="8" style="color: var(--red);">Unable to load: ' + err.message + '</td></tr>';
-        losersBody.innerHTML = '<tr><td colspan="8" style="color: var(--red);">Unable to load: ' + err.message + '</td></tr>';
-      }
-
-      lastUpdated.textContent = "Last updated: " + now.toLocaleTimeString();
-    }
-
-    refreshBtn.addEventListener("click", fetchLiveMovers);
-    fetchLiveMovers();
-    setInterval(fetchLiveMovers, REFRESH_MS);
-        const stockModal = document.getElementById("stockModal");
+    const stockModal = document.getElementById("stockModal");
     document.getElementById("closeModalBtn").addEventListener("click", () => stockModal.classList.remove("open"));
     stockModal.addEventListener("click", e => { if (e.target === stockModal) stockModal.classList.remove("open"); });
 
@@ -596,13 +456,102 @@
     }
 
     document.addEventListener("click", e => {
-      const tickerEl = e.target.closest(".ticker, .ticker-btn");
+      const tickerEl = e.target.closest(".ticker");
       if (tickerEl) {
         const sym = tickerEl.textContent.trim();
         if (sym) showStockPopup(sym);
       }
     });
 
+    async function fetchNyseNasdaqMovers(key) {
+      const base = "https://financialmodelingprep.com";
+      const k = encodeURIComponent(key);
+      const results = await Promise.allSettled(Array.of(
+        safeFetchJson(base + "/stable/biggest-gainers?apikey=" + k),
+        safeFetchJson(base + "/stable/biggest-losers?apikey=" + k),
+        safeFetchJson(base + "/stable/most-actives?apikey=" + k)
+      ));
+
+      const gRes = results.at(0).status === "fulfilled" ? results.at(0).value : Array.of();
+      const lRes = results.at(1).status === "fulfilled" ? results.at(1).value : Array.of();
+      const aRes = results.at(2).status === "fulfilled" ? results.at(2).value : Array.of();
+
+      if (!gRes.length && !lRes.length) {
+        const firstErr = results.at(0).reason || results.at(1).reason;
+        throw new Error(firstErr ? firstErr.message : "No mover data returned from FMP");
+      }
+
+      const bySymbol = new Map();
+      const addList = arr => {
+        if (!Array.isArray(arr)) return;
+        for (const item of arr) {
+          const sym = String(item.symbol || "").toUpperCase();
+          const price = parseNum(item.price);
+          const exch = item.exchangeShortName || item.exchange || "";
+          if (sym && price >= MIN_PRICE && isAllowedExchange(exch) && !bySymbol.has(sym)) {
+            bySymbol.set(sym, {
+              symbol: sym,
+              name: item.name || sym,
+              exchange: exch || (SP500_SET.has(sym) ? "S&P 500" : ""),
+              price: price,
+              afterHours: parseNum(item.postMarketPrice || item.preMarketPrice || 0),
+              change: parseNum(item.change),
+              percentChange: parseNum(item.changesPercentage),
+              volume: parseNum(item.volume)
+            });
+          }
+        }
+      };
+
+      addList(gRes);
+      addList(lRes);
+      addList(aRes);
+      return Array.from(bySymbol.values());
+    }
+
+    async function fetchLiveMovers() {
+      const now = new Date();
+      const key = fmpKeyInput.value.trim();
+
+      if (!key) {
+        statusText.textContent = "Please paste your Financial Modeling Prep API key above and click Update Quotes.";
+        gainersBody.innerHTML = '<tr><td colspan="8" style="color: var(--muted);">Waiting for API key...</td></tr>';
+        losersBody.innerHTML = '<tr><td colspan="8" style="color: var(--muted);">Waiting for API key...</td></tr>';
+        return;
+      }
+
+      localStorage.setItem("fmp_api_key", key);
+      updateKeyVisibility();
+
+      const useSp500Only = marketFilter.value === "sp500";
+      statusText.textContent = "Fetching live US market movers ($5.00+)...";
+
+      try {
+        let pool = await fetchNyseNasdaqMovers(key);
+        if (useSp500Only) {
+          pool = pool.filter(x => SP500_SET.has(x.symbol));
+        }
+
+        currentGainers = pool.filter(x => x.percentChange > 0).sort((a, b) => b.percentChange - a.percentChange).slice(0, MAX_ITEMS);
+        currentLosers = pool.filter(x => x.percentChange < 0).sort((a, b) => a.percentChange - b.percentChange).slice(0, MAX_ITEMS);
+
+        renderTable("gainers");
+        renderTable("losers");
+
+        const scopeLabel = useSp500Only ? "S&P 500 Filter" : "NYSE + NASDAQ (incl. S&P 500)";
+        statusText.textContent = `Live feed: ${scopeLabel} — ${currentGainers.length} Gainers, ${currentLosers.length} Losers ($5.00+)`;
+      } catch (err) {
+        statusText.textContent = "Feed error: " + err.message;
+        gainersBody.innerHTML = '<tr><td colspan="8" style="color: var(--red);">Unable to load: ' + err.message + '</td></tr>';
+        losersBody.innerHTML = '<tr><td colspan="8" style="color: var(--red);">Unable to load: ' + err.message + '</td></tr>';
+      }
+
+      lastUpdated.textContent = "Last updated: " + now.toLocaleTimeString();
+    }
+
+    refreshBtn.addEventListener("click", fetchLiveMovers);
+    fetchLiveMovers();
+    setInterval(fetchLiveMovers, REFRESH_MS);
   </script>
 </body>
 </html>
