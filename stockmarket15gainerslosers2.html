@@ -362,63 +362,41 @@
       return allQuotes;
     }
 
+    async function safeFetchJson(url) {
+      const res = await fetch(url);
+      const text = await res.text();
+      if (!res.ok || text.trim().startsWith("Restricted")) {
+        throw new Error(text.trim() || "HTTP " + res.status);
+      }
+      const data = JSON.parse(text);
+      if (data && data["Error Message"]) {
+        throw new Error(data["Error Message"]);
+      }
+      return data;
+    }
+
     async function fetchNyseNasdaqMovers(key) {
       const base = "https://financialmodelingprep.com";
+      const k = encodeURIComponent(key);
 
-      // 1. Try FMP Company Screener first (scans all NYSE & NASDAQ stocks >= $5.00)
-      try {
-        const pair = await Promise.all(Array.of(
-          fetch(base + "/stable/company-screener?exchange=NYSE&priceMoreThan=5&isActivelyTrading=true&limit=500&apikey=" + encodeURIComponent(key)),
-          fetch(base + "/stable/company-screener?exchange=NASDAQ&priceMoreThan=5&isActivelyTrading=true&limit=500&apikey=" + encodeURIComponent(key))
-        ));
-        if (pair.at(0).ok && pair.at(1).ok) {
-          const nyseList = await pair.at(0).json();
-          const nasdaqList = await pair.at(1).json();
-          if (Array.isArray(nyseList) && Array.isArray(nasdaqList) && (nyseList.length + nasdaqList.length) > 50) {
-            const combined = nyseList.concat(nasdaqList)
-              .filter(x => x.symbol && parseNum(x.price) >= MIN_PRICE && parseNum(x.volume) > 50000);
-            const topSymbols = combined
-              .sort((a, b) => Math.abs(parseNum(b.changesPercentage || b.change)) - Math.abs(parseNum(a.changesPercentage || a.change)))
-              .slice(0, 150)
-              .map(x => x.symbol);
-
-            if (topSymbols.length > 0) {
-              const qRes = await fetch(base + "/stable/batch-quote?symbols=" + encodeURIComponent(topSymbols.join(",")) + "&apikey=" + encodeURIComponent(key));
-              const qData = await qRes.json();
-              if (Array.isArray(qData) && qData.length > 20) {
-                return qData.map(q => ({
-                  symbol: String(q.symbol || "").toUpperCase(),
-                  name: q.name || q.symbol,
-                  exchange: q.exchange || "",
-                  price: parseNum(q.price),
-                  afterHours: parseNum(q.postMarketPrice || q.preMarketPrice || 0),
-                  change: parseNum(q.change),
-                  percentChange: parseNum(q.changesPercentage),
-                  volume: parseNum(q.volume)
-                })).filter(x => x.price >= MIN_PRICE);
-              }
-            }
-          }
-        }
-      } catch (e) {}
-
-      // 2. Combine FMP biggest-gainers/losers WITH full S&P 500 batch quotes so major stocks like NVDA are always included
-      const [gRes, lRes, sp500Quotes] = await Promise.all(Array.of(
-        fetch(base + "/stable/biggest-gainers?apikey=" + encodeURIComponent(key)).then(r => r.json()),
-        fetch(base + "/stable/biggest-losers?apikey=" + encodeURIComponent(key)).then(r => r.json()),
-        fetchAllSp500Quotes(key)
+      // Fetch gainers, losers, and most-active stocks (all included in FMP free tier)
+      const results = await Promise.allSettled(Array.of(
+        safeFetchJson(base + "/stable/biggest-gainers?apikey=" + k),
+        safeFetchJson(base + "/stable/biggest-losers?apikey=" + k),
+        safeFetchJson(base + "/stable/most-actives?apikey=" + k)
       ));
 
-      if ((gRes && gRes["Error Message"]) || (lRes && lRes["Error Message"])) {
-        throw new Error(gRes["Error Message"] || lRes["Error Message"]);
+      const gRes = results.at(0).status === "fulfilled" ? results.at(0).value : Array.of();
+      const lRes = results.at(1).status === "fulfilled" ? results.at(1).value : Array.of();
+      const aRes = results.at(2).status === "fulfilled" ? results.at(2).value : Array.of();
+
+      if (!gRes.length && !lRes.length) {
+        const firstErr = results.at(0).reason || results.at(1).reason;
+        throw new Error(firstErr ? firstErr.message : "No mover data returned from FMP");
       }
 
       const bySymbol = new Map();
-      for (const item of sp500Quotes) {
-        bySymbol.set(item.symbol, item);
-      }
-
-      const addMovers = arr => {
+      const addList = arr => {
         if (!Array.isArray(arr)) return;
         for (const item of arr) {
           const sym = String(item.symbol || "").toUpperCase();
@@ -428,9 +406,9 @@
             bySymbol.set(sym, {
               symbol: sym,
               name: item.name || sym,
-              exchange: exch,
+              exchange: exch || (SP500_SET.has(sym) ? "S&P 500" : ""),
               price: price,
-              afterHours: 0,
+              afterHours: parseNum(item.postMarketPrice || item.preMarketPrice || 0),
               change: parseNum(item.change),
               percentChange: parseNum(item.changesPercentage),
               volume: parseNum(item.volume)
@@ -439,8 +417,9 @@
         }
       };
 
-      addMovers(gRes);
-      addMovers(lRes);
+      addList(gRes);
+      addList(lRes);
+      addList(aRes);
 
       return Array.from(bySymbol.values());
     }
@@ -460,14 +439,14 @@
       updateKeyVisibility();
 
       const useSp500Only = marketFilter.value === "sp500";
-      statusText.textContent = useSp500Only
-        ? "Scanning all 503 S&P 500 stocks ($5.00+)..."
-        : "Scanning NYSE, NASDAQ & all S&P 500 stocks ($5.00+)...";
+      statusText.textContent = "Fetching live US market movers ($5.00+)...";
 
       try {
-        const pool = useSp500Only
-          ? await fetchAllSp500Quotes(key)
-          : await fetchNyseNasdaqMovers(key);
+        let pool = await fetchNyseNasdaqMovers(key);
+
+        if (useSp500Only) {
+          pool = pool.filter(x => SP500_SET.has(x.symbol));
+        }
 
         currentGainers = pool
           .filter(x => x.percentChange > 0)
@@ -482,8 +461,8 @@
         renderTable("gainers");
         renderTable("losers");
 
-        const scopeLabel = useSp500Only ? "S&P 500 Only (All 503 scanned)" : "NYSE + NASDAQ + S&P 500";
-        statusText.textContent = `Live feed: ${scopeLabel} — Top ${currentGainers.length} Gainers & Top ${currentLosers.length} Losers ($5.00+)`;
+        const scopeLabel = useSp500Only ? "S&P 500 Filter" : "NYSE + NASDAQ (incl. S&P 500)";
+        statusText.textContent = `Live feed: ${scopeLabel} — ${currentGainers.length} Gainers, ${currentLosers.length} Losers ($5.00+)`;
       } catch (err) {
         statusText.textContent = "Feed error: " + err.message;
         gainersBody.innerHTML = '<tr><td colspan="8" style="color: var(--red);">Unable to load: ' + err.message + '</td></tr>';
