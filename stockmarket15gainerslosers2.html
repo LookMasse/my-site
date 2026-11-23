@@ -171,7 +171,7 @@
     function parseNum(val) {
       if (typeof val === "number") return val;
       if (!val) return 0;
-      return Number(String(val).replace(/[$,%+]/g, "").replace(/,/g, "")) || 0;
+      return Number(String(val).replace(/[$,%+()]/g, "").replace(/,/g, "")) || 0;
     }
 
     function formatVol(volStr) {
@@ -214,18 +214,14 @@
       }).join("");
     }
 
-    function buildProxyList(targetUrl) {
+    async function fetchTextViaProxies(targetUrl) {
       const u1 = new URL("https://allorigins.win");
       u1.searchParams.set("url", targetUrl);
 
       const u2 = new URL("https://codetabs.com");
       u2.searchParams.set("quest", targetUrl);
 
-      return Array.of(u1.toString(), u2.toString());
-    }
-
-    async function fetchTextViaProxies(targetUrl) {
-      const proxyUrls = buildProxyList(targetUrl);
+      const proxyUrls = Array.of(u1.toString(), u2.toString());
       let lastErr;
 
       for (const proxyUrl of proxyUrls) {
@@ -237,41 +233,96 @@
           if (!res.ok) throw new Error("HTTP " + res.status);
           const text = await res.text();
           if (text.trim().startsWith("{")) {
-            const parsed = JSON.parse(text);
-            if (parsed && typeof parsed.contents === "string") return parsed.contents;
+            try {
+              const parsed = JSON.parse(text);
+              if (parsed && typeof parsed.contents === "string" && parsed.contents.length > 50) {
+                return parsed.contents;
+              }
+            } catch (e) {}
           }
-          return text;
+          if (text.length > 50) return text;
         } catch (err) {
           lastErr = err;
         }
       }
       throw lastErr || new Error("Proxy connection failed");
     }
-
     function parseYahooHtml(htmlString) {
       const doc = new DOMParser().parseFromString(htmlString, "text/html");
-      const rows = Array.from(doc.querySelectorAll("table tbody tr"));
+      const rows = Array.from(doc.querySelectorAll("table tr"));
       const items = Array.of();
 
       for (const tr of rows) {
         const cells = Array.from(tr.querySelectorAll("td"));
-        if (cells.length < 6) continue;
+        if (cells.length < 5) continue;
 
-        const symbolText = (cells.at(0).textContent || "").trim().split(/\s+/).at(0);
+        const rawSym = (cells.at(0).textContent || "").trim().split(/\s+/).at(0);
+        if (!rawSym || !/^[A-Z]{1,5}(\.[A-Z])?$/.test(rawSym)) continue;
+
         const nameText = (cells.at(1).textContent || "").trim();
-        const priceText = (cells.at(3).textContent || cells.at(2).textContent || "").trim().split(/\s+/).at(0);
-        const changeText = (cells.at(4).textContent || "").trim();
-        const pctText = (cells.at(5).textContent || "").trim();
-        const volText = cells.at(6) ? (cells.at(6).textContent || "").trim() : "--";
+        let priceVal = 0;
+        let chgVal = 0;
+        let pctVal = 0;
+        let volText = "--";
 
-        if (symbolText && /^[A-Z.\-]{1,6}$/.test(symbolText) && parseNum(priceText) > 0) {
+        for (let idx = 2; idx < cells.length; idx++) {
+          const txt = (cells.at(idx).textContent || "").trim();
+          if (!priceVal && /^\$?\d[\d,]*\.\d+$/.test(txt.split(/\s+/).at(0))) {
+            priceVal = parseNum(txt.split(/\s+/).at(0));
+          } else if (txt.includes("%")) {
+            pctVal = parseNum(txt);
+          } else if (/^[+-]\d[\d,]*\.\d+$/.test(txt)) {
+            chgVal = parseNum(txt);
+          } else if (/^\d[\d.,]*[BMK]$/i.test(txt) || /^\d{1,3}(,\d{3})+$/.test(txt)) {
+            volText = txt;
+          }
+        }
+
+        if (priceVal > 0 && pctVal !== 0) {
+          if (!chgVal) chgVal = priceVal - (priceVal / (1 + pctVal / 100));
           items.push({
-            symbol: symbolText,
-            name: nameText || symbolText,
-            price: priceText,
-            change: changeText,
-            percentChange: pctText,
+            symbol: rawSym,
+            name: nameText || rawSym,
+            price: priceVal,
+            change: chgVal,
+            percentChange: pctVal,
             volume: volText
+          });
+        }
+        if (items.length >= 15) break;
+      }
+      return items;
+    }
+
+    function parseFinvizHtml(htmlString) {
+      const doc = new DOMParser().parseFromString(htmlString, "text/html");
+      const rows = Array.from(doc.querySelectorAll("tr"));
+      const items = Array.of();
+
+      for (const tr of rows) {
+        const cells = Array.from(tr.querySelectorAll("td"));
+        if (cells.length < 10) continue;
+        const rankTxt = (cells.at(0).textContent || "").trim();
+        const symTxt = (cells.at(1).textContent || "").trim();
+        if (!/^\d+$/.test(rankTxt) || !/^[A-Z]{1,5}$/.test(symTxt)) continue;
+
+        const nameTxt = (cells.at(2).textContent || "").trim();
+        const priceTxt = (cells.at(8).textContent || "").trim();
+        const pctTxt = (cells.at(9).textContent || "").trim();
+        const volTxt = (cells.at(10) ? cells.at(10).textContent : "--").trim();
+
+        const priceVal = parseNum(priceTxt);
+        const pctVal = parseNum(pctTxt);
+        const chgVal = priceVal ? priceVal - (priceVal / (1 + pctVal / 100)) : 0;
+
+        if (priceVal > 0) {
+          items.push({
+            symbol: symTxt,
+            name: nameTxt || symTxt,
+            price: priceVal,
+            change: chgVal,
+            percentChange: pctVal,
+            volume: volTxt
           });
         }
         if (items.length >= 15) break;
@@ -284,121 +335,75 @@
         fetchTextViaProxies("https://yahoo.com"),
         fetchTextViaProxies("https://yahoo.com")
       ));
-
       const gainers = parseYahooHtml(pair.at(0));
       const losers = parseYahooHtml(pair.at(1));
-
-      if (!gainers.length && !losers.length) {
-        throw new Error("Could not parse Yahoo Finance table");
-      }
-
-      return {
-        gainers: gainers,
-        losers: losers,
-        label: "Live feed: Yahoo Finance US Markets (Gainers & Losers)"
-      };
+      if (!gainers.length && !losers.length) throw new Error("Yahoo layout blocked");
+      return { gainers: gainers, losers: losers, label: "Live feed: Yahoo Finance US Markets" };
     }
 
-    async function fetchFromNasdaq() {
-      const u = new URL("https://nasdaq.com");
-      u.searchParams.set("assetclass", "stocks");
-
-      const rawText = await fetchTextViaProxies(u.toString());
-      const json = JSON.parse(rawText);
-      const stocks = json && json.data && json.data.STOCKS;
-      if (!stocks) throw new Error("Nasdaq payload unavailable");
-
-      const mapRows = rows => (Array.isArray(rows) ? rows : Array.of()).map(r => ({
-        symbol: r.symbol,
-        name: r.name,
-        price: r.lastSalePrice,
-        change: r.netChange,
-        percentChange: r.percentageChange,
-        volume: r.volume
-      }));
-
-      const gainers = mapRows(stocks.MostAdvanced && stocks.MostAdvanced.table && stocks.MostAdvanced.table.rows);
-      const losers = mapRows(stocks.MostDeclined && stocks.MostDeclined.table && stocks.MostDeclined.table.rows);
-
-      if (!gainers.length && !losers.length) throw new Error("Empty Nasdaq rows");
-      return { gainers: gainers, losers: losers, label: "Live feed: Nasdaq Market Movers" };
+    async function fetchFromFinviz() {
+      const gUrl = "https://finviz.com";
+      const lUrl = "https://finviz.com";
+      const pair = await Promise.all(Array.of(fetchTextViaProxies(gUrl), fetchTextViaProxies(lUrl)));
+      const gainers = parseFinvizHtml(pair.at(0));
+      const losers = parseFinvizHtml(pair.at(1));
+      if (!gainers.length && !losers.length) throw new Error("Finviz screener unavailable");
+      return { gainers: gainers, losers: losers, label: "Live feed: US Intraday Screener (NYSE / NASDAQ)" };
     }
 
     async function fetchFromFMP() {
       const key = fmpKeyInput.value.trim();
       if (!key) throw new Error("Enter your free Financial Modeling Prep API key");
       localStorage.setItem("fmp_api_key", key);
-
       const gUrl = new URL("https://financialmodelingprep.com");
       gUrl.searchParams.set("apikey", key);
-
       const lUrl = new URL("https://financialmodelingprep.com");
       lUrl.searchParams.set("apikey", key);
-
-      const pair = await Promise.all(Array.of(
-        fetch(gUrl.toString()),
-        fetch(lUrl.toString())
-      ));
-
+      const pair = await Promise.all(Array.of(fetch(gUrl.toString()), fetch(lUrl.toString())));
       const gJson = await pair.at(0).json();
       const lJson = await pair.at(1).json();
-
       if (gJson["Error Message"] || lJson["Error Message"]) {
         throw new Error(gJson["Error Message"] || lJson["Error Message"]);
       }
-
       const mapFmp = arr => (Array.isArray(arr) ? arr : Array.of()).map(item => ({
-        symbol: item.symbol,
-        name: item.name,
-        price: item.price,
-        change: item.change,
-        percentChange: item.changesPercentage,
-        volume: item.volume || 0
+        symbol: item.symbol, name: item.name, price: item.price,
+        change: item.change, percentChange: item.changesPercentage, volume: item.volume || 0
       }));
-
       return { gainers: mapFmp(gJson), losers: mapFmp(lJson), label: "Live feed: Financial Modeling Prep (FMP)" };
     }
 
     async function fetchLiveMovers() {
       const now = new Date();
-      const mode = sourceSelect.value;
       statusText.textContent = "Fetching live US market quotes...";
-
       try {
         let result;
-        if (mode === "fmp") {
+        if (sourceSelect.value === "fmp") {
           result = await fetchFromFMP();
-        } else if (mode === "nasdaq") {
-          result = await fetchFromNasdaq();
         } else {
           try {
             result = await fetchFromYahoo();
           } catch (yahooErr) {
-            console.warn("Yahoo failed, falling back to Nasdaq:", yahooErr);
-            result = await fetchFromNasdaq();
+            result = await fetchFromFinviz();
           }
         }
-
         renderRows(gainersBody, result.gainers, true);
         renderRows(losersBody, result.losers, false);
         statusText.textContent = result.label;
       } catch (err) {
-        console.error(err);
         statusText.textContent = "Feed error: " + err.message;
         gainersBody.innerHTML = '<tr><td colspan="7" style="color: var(--red);">Unable to load: ' + err.message + '</td></tr>';
         losersBody.innerHTML = '<tr><td colspan="7" style="color: var(--red);">Unable to load: ' + err.message + '</td></tr>';
       }
-
       lastUpdated.textContent = "Last updated: " + now.toLocaleTimeString();
     }
 
     refreshBtn.addEventListener("click", fetchLiveMovers);
-
     fetchLiveMovers();
     setInterval(fetchLiveMovers, REFRESH_MS);
   </script>
 </body>
 </html>
 
-</html>
+
+
 
