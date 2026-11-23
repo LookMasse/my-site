@@ -1,194 +1,549 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Live US Stock Movers – Top 15 Gainers & Losers</title>
+
   <style>
     :root {
-      --bg: #090d16; --card: #111827; --border: #1f2937; --text: #f9fafb;
-      --muted: #9ca3af; --accent: #38bdf8; --green: #10b981;
-      --green-bg: rgba(16,185,129,.15); --red: #ef4444; --red-bg: rgba(239,68,68,.15);
+      --bg: #090d16;
+      --card: #111827;
+      --border: #1f2937;
+      --text: #f9fafb;
+      --muted: #9ca3af;
+      --accent: #38bdf8;
+      --green: #10b981;
+      --green-bg: rgba(16,185,129,.15);
+      --red: #ef4444;
+      --red-bg: rgba(239,68,68,.15);
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.4; }
-    header { max-width: 1400px; margin: 0 auto 18px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
-    .title-group h1 { font-size: 1.45rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
-    .live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); display: inline-block; box-shadow: 0 0 8px var(--green); }
-    .subtitle { color: var(--muted); font-size: .86rem; margin-top: 4px; }
-    .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    select, input { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; font-size: .88rem; }
-    button { background: var(--accent); color: #090d16; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: .88rem; cursor: pointer; }
-    button:hover { opacity: .9; } button:disabled { opacity: .6; cursor: wait; }
-    .status-bar { max-width: 1400px; margin: 0 auto 18px; font-size: .83rem; color: var(--muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-    .grid { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-    @media (max-width: 1050px) { .grid { grid-template-columns: 1fr; } }
-    .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; }
-    .panel-header { padding: 14px 18px; background: rgba(9,13,22,.6); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-    .panel-header h2 { font-size: 1.05rem; font-weight: 600; } .gainer-title { color: var(--green); } .loser-title { color: var(--red); }
-    table { width: 100%; border-collapse: collapse; font-size: .86rem; }
-    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
-    th { color: var(--muted); font-weight: 600; font-size: .74rem; text-transform: uppercase; letter-spacing: .04em; }
-    th.num, td.num { text-align: right; font-family: ui-monospace,SFMono-Regular,Menlo,monospace; }
-    tr:last-child td { border-bottom: none; } .rank { color: var(--muted); width: 32px; }
-    .ticker { font-family: ui-monospace,SFMono-Regular,Menlo,monospace; font-weight: 700; color: var(--accent); }
-    .company { color: var(--muted); font-size: .8rem; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
-    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-weight: 600; font-size: .78rem; }
-    .pill-gain { background: var(--green-bg); color: var(--green); } .pill-loss { background: var(--red-bg); color: var(--red); }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont,
+        "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 20px;
+      line-height: 1.4;
+    }
+
+    header {
+      max-width: 1400px;
+      margin: 0 auto 18px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .title-group h1 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .live-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+      display: inline-block;
+      box-shadow: 0 0 8px var(--green);
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: .86rem;
+      margin-top: 4px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      background: var(--accent);
+      color: #090d16;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: .88rem;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: .9;
+    }
+
+    button:disabled {
+      opacity: .6;
+      cursor: wait;
+    }
+
+    .status-bar {
+      max-width: 1400px;
+      margin: 0 auto 18px;
+      font-size: .83rem;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .grid {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 22px;
+    }
+
+    @media (max-width: 1050px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+
+      .title-group h1 {
+        font-size: 1.15rem;
+      }
+
+      .panel-header {
+        padding: 12px;
+      }
+
+      th, td {
+        padding: 9px 10px;
+        font-size: .78rem;
+      }
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow-x: auto;
+    }
+
+    .panel-header {
+      padding: 14px 18px;
+      background: rgba(9,13,22,.6);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-header h2 {
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+
+    .gainer-title {
+      color: var(--green);
+    }
+
+    .loser-title {
+      color: var(--red);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .86rem;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: .74rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    th.num, td.num {
+      text-align: right;
+      font-family: ui-monospace, SFMono-Regular,
+        Menlo, monospace;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .rank {
+      color: var(--muted);
+      width: 32px;
+    }
+
+    .ticker {
+      font-family: ui-monospace, SFMono-Regular,
+        Menlo, monospace;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .company {
+      color: var(--muted);
+      font-size: .8rem;
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: .78rem;
+    }
+
+    .pill-gain {
+      background: var(--green-bg);
+      color: var(--green);
+    }
+
+    .pill-loss {
+      background: var(--red-bg);
+      color: var(--red);
+    }
+
+    .loading {
+      color: var(--muted);
+      padding: 20px;
+      text-align: center;
+    }
+
+    .error {
+      color: var(--red);
+      padding: 15px;
+    }
+
+    .footer {
+      max-width: 1400px;
+      margin: 22px auto 0;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: .75rem;
+      text-align: center;
+    }
   </style>
 </head>
+
 <body>
+
   <header>
     <div class="title-group">
-      <h1><span class="live-dot"></span><span>Live US Stock Market Movers</span></h1>
-      <div class="subtitle">Top 15 daily gainers and losers · Refreshes every 60 seconds</div>
+      <h1>
+        <span class="live-dot"></span>
+        <span>Live US Stock Market Movers</span>
+      </h1>
+
+      <div class="subtitle">
+        Top 15 daily gainers and losers · Refreshes every 60 seconds
+      </div>
     </div>
+
     <div class="controls">
-      <select id="sourceSelect">
-        <option value="yahoo">Yahoo Finance (may be blocked by CORS)</option>
-        <option value="fmp">Financial Modeling Prep (API key required)</option>
-      </select>
-      <input type="password" id="fmpKeyInput" placeholder="Paste FMP API key" autocomplete="off" style="display:none;" />
-      <button id="refreshBtn">Update Live Quotes</button>
+      <button id="refreshBtn" onclick="fetchLiveMovers()">
+        Update Live Quotes
+      </button>
     </div>
   </header>
-  <div class="status-bar"><span id="statusText">Loading market data…</span><span id="lastUpdated">Last updated: --</span></div>
+
+  <div class="status-bar">
+    <span id="statusText">Loading market data...</span>
+    <span id="lastUpdated">Last updated: --</span>
+  </div>
+
   <main class="grid">
+
+    <!-- TOP GAINERS -->
+
     <section class="panel">
-      <div class="panel-header"><h2 class="gainer-title">Top 15 Day Gainers</h2><span style="color:var(--muted);font-size:.78rem">Intraday USD</span></div>
-      <table><thead><tr><th class="rank">#</th><th>Symbol</th><th>Company</th><th class="num">Price</th><th class="num">Change</th><th class="num">% Chg</th><th class="num">Volume</th></tr></thead>
-      <tbody id="gainersBody"><tr><td colspan="7">Loading gainers…</td></tr></tbody></table>
+
+      <div class="panel-header">
+        <h2 class="gainer-title">Top 15 Day Gainers</h2>
+        <span style="color:var(--muted);font-size:.78rem">
+          Intraday USD
+        </span>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th class="rank">#</th>
+            <th>Symbol</th>
+            <th>Company</th>
+            <th class="num">Price</th>
+            <th class="num">Change</th>
+            <th class="num">% Chg</th>
+            <th class="num">Volume</th>
+          </tr>
+        </thead>
+
+        <tbody id="gainersBody">
+          <tr>
+            <td colspan="7" class="loading">
+              Loading gainers...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
     </section>
+
+    <!-- TOP LOSERS -->
+
     <section class="panel">
-      <div class="panel-header"><h2 class="loser-title">Top 15 Day Losers</h2><span style="color:var(--muted);font-size:.78rem">Intraday USD</span></div>
-      <table><thead><tr><th class="rank">#</th><th>Symbol</th><th>Company</th><th class="num">Price</th><th class="num">Change</th><th class="num">% Chg</th><th class="num">Volume</th></tr></thead>
-      <tbody id="losersBody"><tr><td colspan="7">Loading losers…</td></tr></tbody></table>
+
+      <div class="panel-header">
+        <h2 class="loser-title">Top 15 Day Losers</h2>
+        <span style="color:var(--muted);font-size:.78rem">
+          Intraday USD
+        </span>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th class="rank">#</th>
+            <th>Symbol</th>
+            <th>Company</th>
+            <th class="num">Price</th>
+            <th class="num">Change</th>
+            <th class="num">% Chg</th>
+            <th class="num">Volume</th>
+          </tr>
+        </thead>
+
+        <tbody id="losersBody">
+          <tr>
+            <td colspan="7" class="loading">
+              Loading losers...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
     </section>
+
   </main>
+
+  <div class="footer">
+    Market data provided by Financial Modeling Prep.
+    Data may be delayed depending on your subscription.
+    Not investment advice.
+  </div>
+
 <script>
-  "use strict";
-  const REFRESH_MS = 60_000;
-  const $ = (id) => document.getElementById(id);
-  const sourceSelect = $("sourceSelect"), fmpKeyInput = $("fmpKeyInput"), refreshBtn = $("refreshBtn");
-  const gainersBody = $("gainersBody"), losersBody = $("losersBody"), statusText = $("statusText"), lastUpdated = $("lastUpdated");
-  let refreshInProgress = false;
+"use strict";
 
-  try { fmpKeyInput.value = localStorage.getItem("fmp_api_key") || ""; } catch (_) {}
-  sourceSelect.addEventListener("change", () => {
-    fmpKeyInput.style.display = sourceSelect.value === "fmp" ? "inline-block" : "none";
-    fetchLiveMovers();
-  });
-  fmpKeyInput.addEventListener("change", () => {
-    try { localStorage.setItem("fmp_api_key", fmpKeyInput.value.trim()); } catch (_) {}
-  });
-  refreshBtn.addEventListener("click", fetchLiveMovers);
+const REFRESH_MS = 60000;
 
-  function parseNum(value) {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (value == null || value === "") return 0;
-    const cleaned = String(value).replace(/[,$%+()]/g, "").replace(/,/g, "").trim();
-    const n = Number(cleaned);
-    return Number.isFinite(n) ? n : 0;
-  }
-  function formatVolume(value) {
-    if (value == null || value === "") return "--";
-    if (typeof value === "string" && /[BMK]$/i.test(value.trim())) return value.trim();
-    const n = parseNum(value);
-    if (!n) return "--";
-    if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
-    if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
-    if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
-    return n.toLocaleString("en-US");
-  }
-  function escapeHtml(value) {
-    return String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
-  }
-  function renderRows(tbody, items, isGainer) {
-    if (!Array.isArray(items) || !items.length) {
-      tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted)">No data returned.</td></tr>';
-      return;
-    }
-    tbody.innerHTML = items.slice(0, 15).map((item, index) => {
-      const price = parseNum(item.price), change = parseNum(item.change), pct = parseNum(item.percentChange);
-      const changeText = (change >= 0 ? "+" : "") + change.toFixed(2);
-      const pctText = (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%";
-      const pill = isGainer ? "pill-gain" : "pill-loss";
-      const symbol = escapeHtml(item.symbol || "--"), name = escapeHtml(item.name || item.symbol || "--");
-      return `<tr><td class="rank">${index + 1}</td><td class="ticker">${symbol}</td><td class="company" title="${name}">${name}</td><td class="num">$${price.toFixed(2)}</td><td class="num">${changeText}</td><td class="num"><span class="pill ${pill}">${pctText}</span></td><td class="num">${escapeHtml(formatVolume(item.volume))}</td></tr>`;
-    }).join("");
+const $ = id => document.getElementById(id);
+
+const refreshBtn = $("refreshBtn");
+const gainersBody = $("gainersBody");
+const losersBody = $("losersBody");
+const statusText = $("statusText");
+const lastUpdated = $("lastUpdated");
+
+let refreshInProgress = false;
+
+function parseNum(value) {
+  if (typeof value === "number" &&
+      Number.isFinite(value)) {
+    return value;
   }
 
-  async function fetchJson(url, timeoutMs = 12000) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const response = await fetch(url, { signal: controller.signal, headers: { "Accept": "application/json" } });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return await response.json();
-    } finally { clearTimeout(timeout); }
+  if (value == null || value === "") return 0;
+
+  const n = Number(
+    String(value).replace(/[,$%+()]/g, "").trim()
+  );
+
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatVolume(value) {
+  if (value == null || value === "") return "--";
+
+  if (typeof value === "string" &&
+      /[BMK]$/i.test(value.trim())) {
+    return value.trim();
   }
-  function yahooUrl(scrId) {
-    const url = new URL("https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved");
-    url.searchParams.set("scrIds", scrId); url.searchParams.set("count", "25"); url.searchParams.set("start", "0");
-    return url.toString();
+
+  const n = parseNum(value);
+
+  if (!n) return "--";
+
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+
+  return n.toLocaleString("en-US");
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[ch]);
+}
+
+function renderRows(tbody, items, isGainer) {
+
+  if (!Array.isArray(items) || !items.length) {
+    tbody.innerHTML =
+      '<tr><td colspan="7" style="color:var(--muted)">No data returned.</td></tr>';
+    return;
   }
-  function mapYahoo(json) {
-    const quotes = json?.finance?.result?.[0]?.quotes || [];
-    return quotes.map(q => ({
-      symbol: q.symbol, name: q.shortName || q.longName || q.symbol,
-      price: q.regularMarketPrice, change: q.regularMarketChange,
-      percentChange: q.regularMarketChangePercent, volume: q.regularMarketVolume
-    })).filter(q => q.symbol && Number.isFinite(Number(q.price)));
-  }
-  async function fetchFromYahoo() {
-    const [gJson, lJson] = await Promise.all([fetchJson(yahooUrl("day_gainers")), fetchJson(yahooUrl("day_losers"))]);
-    const gainers = mapYahoo(gJson), losers = mapYahoo(lJson);
-    if (!gainers.length && !losers.length) throw new Error("Yahoo returned no quote data. It may be blocking browser requests (CORS).");
-    return { gainers, losers, label: "Source: Yahoo Finance screener" };
-  }
-  async function fetchFromFMP() {
-    const key = fmpKeyInput.value.trim();
-    if (!key) throw new Error("Please enter your FMP API key.");
-    try { localStorage.setItem("fmp_api_key", key); } catch (_) {}
-    const base = "https://financialmodelingprep.com/stable";
-    const [gJson, lJson] = await Promise.all([
-      fetchJson(`${base}/biggest-gainers?apikey=${encodeURIComponent(key)}`),
-      fetchJson(`${base}/biggest-losers?apikey=${encodeURIComponent(key)}`)
-    ]);
-    if (!Array.isArray(gJson) || !Array.isArray(lJson)) {
-      const msg = gJson?.message || lJson?.message || gJson?.Error || lJson?.Error || "Unexpected FMP response. Check API key and plan.";
-      throw new Error(msg);
-    }
-    const mapFmp = (list) => list.map(item => ({
-      symbol: item.symbol, name: item.name || item.companyName || item.symbol,
-      price: item.price, change: item.change,
-      percentChange: item.changesPercentage ?? item.changePercentage,
-      volume: item.volume
-    })).filter(item => item.symbol && Number.isFinite(Number(item.price))).slice(0, 15);
-    return { gainers: mapFmp(gJson), losers: mapFmp(lJson), label: "Source: Financial Modeling Prep" };
-  }
-  async function fetchLiveMovers() {
-    if (refreshInProgress) return;
-    refreshInProgress = true; refreshBtn.disabled = true;
-    statusText.textContent = "Fetching live market data…";
-    const startedAt = new Date();
-    try {
-      const result = sourceSelect.value === "fmp" ? await fetchFromFMP() : await fetchFromYahoo();
-      renderRows(gainersBody, result.gainers, true); renderRows(losersBody, result.losers, false);
-      statusText.textContent = result.label;
-    } catch (error) {
-      const message = error?.name === "AbortError" ? "Request timed out." : (error?.message || "Unknown error");
-      statusText.textContent = "Feed error: " + message;
-      const safeMessage = escapeHtml(message);
-      gainersBody.innerHTML = `<tr><td colspan="7" style="color:var(--red)">Unable to load: ${safeMessage}</td></tr>`;
-      losersBody.innerHTML = `<tr><td colspan="7" style="color:var(--red)">Unable to load: ${safeMessage}</td></tr>`;
-    } finally {
-      lastUpdated.textContent = "Last updated: " + startedAt.toLocaleTimeString();
-      refreshInProgress = false; refreshBtn.disabled = false;
-    }
-  }
-  fetchLiveMovers();
-  setInterval(fetchLiveMovers, REFRESH_MS);
+
+  tbody.innerHTML = items.slice(0, 15).map((item, index) => {
+
+    const price = parseNum(item.price);
+    const change = parseNum(item.change);
+    const pct = parseNum(item.percentChange);
+
+    const changeText =
+      (change >= 0 ? "+" : "") + change.toFixed(2);
+
+    const pctText =
+      (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%";
+
+    const pill = isGainer ? "pill-gain" : "pill-loss";
+
+    const symbol = escapeHtml(item.symbol || "--");
+    const name = escapeHtml(item.name || item.symbol || "--");
+
+    return `
+      <tr>
+        <td class="rank">${index + 1}</td>
+        <td class="ticker">${symbol}</td>
+        <td class="company" title="${name}">${name}</td>
+        <td class="num">$${price.toFixed(2)}</td>
+        <td class="num">${changeText}</td>
+        <td class="num">
+          <span class="pill ${pill}">${pctText}</span>
+        </td>
+        <td class="num">
+          ${escapeHtml(formatVolume(item.volume))}
+        </td>
+      </tr>
+    `;
+
+  }).join("");
+}
+
+function showError(message) {
+
+  const safeMessage = escapeHtml(message);
+
+  gainersBody.innerHTML =
+    `<tr><td colspan="7" class="error">Unable to load: ${safeMessage}</td></tr>`;
+
+  losersBody.innerHTML =
+    `<tr><td colspan="7" class="error">Unable to load: ${safeMessage}</td></tr>`;
+
+  statusText.textContent = "Feed error: " + message;
+}
+
+function fetchLiveMovers() {
+
+  if (refreshInProgress) return;
+
+  refreshInProgress = true;
+  refreshBtn.disabled = true;
+
+  statusText.textContent = "Fetching live market data...";
+
+  const startedAt = new Date();
+
+  google.script.run
+
+    .withSuccessHandler(result => {
+
+      try {
+
+        renderRows(gainersBody, result.gainers, true);
+        renderRows(losersBody, result.losers, false);
+
+        statusText.textContent = result.label;
+
+        lastUpdated.textContent =
+          "Last updated: " + startedAt.toLocaleTimeString();
+
+      } catch (error) {
+
+        showError(error.message || "Unable to display stock data.");
+
+      } finally {
+
+        refreshInProgress = false;
+        refreshBtn.disabled = false;
+
+      }
+
+    })
+
+    .withFailureHandler(error => {
+
+      showError(error.message || "Unable to connect to FMP.");
+
+      lastUpdated.textContent =
+        "Last updated: " + startedAt.toLocaleTimeString();
+
+      refreshInProgress = false;
+      refreshBtn.disabled = false;
+
+    })
+
+    .getLiveMovers();
+}
+
+// Load market data when the page opens
+fetchLiveMovers();
+
+// Automatically refresh every 60 seconds
+setInterval(fetchLiveMovers, REFRESH_MS);
+
 </script>
+
 </body>
 </html>
