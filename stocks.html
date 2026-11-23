@@ -4,6 +4,35 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Live US Stock Movers – NYSE, NASDAQ &amp; S&amp;P 500 ($5+)</title>
+      .ticker-btn {
+      background: none; border: none; padding: 2px 5px; margin: -2px -5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 700; font-size: 0.86rem; color: var(--accent);
+      cursor: pointer; border-radius: 4px; text-decoration: underline;
+    }
+    .ticker-btn:hover { background: rgba(56, 189, 248, 0.15); }
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.78);
+      z-index: 1000; align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      width: 100%; max-width: 760px; overflow: hidden;
+    }
+    .modal-top, .modal-footer {
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    }
+    .modal-footer { border-bottom: none; border-top: 1px solid var(--border); }
+    .modal-body { padding: 18px; }
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+    .stat-box { background: rgba(9, 13, 22, 0.55); border: 1px solid var(--border); padding: 10px; border-radius: 8px; }
+    .stat-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; }
+    .stat-val { font-size: 1rem; font-weight: 700; font-family: monospace; margin-top: 3px; }
+    .chart-wrap { background: rgba(9, 13, 22, 0.45); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+    .ext-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600; }
+
   <style>
     :root {
       --bg: #090d16;
@@ -166,6 +195,34 @@
       </table>
     </section>
   </main>
+    <div id="stockModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-top">
+        <div>
+          <div style="font-size:1.15rem;font-weight:700;" id="modalTitle">Stock Details</div>
+          <div style="color:var(--muted);font-size:0.82rem;" id="modalSub">7-Day Price History</div>
+        </div>
+        <button id="closeModalBtn" class="secondary">Close ✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="stats-row">
+          <div class="stat-box"><div class="stat-label">Price</div><div class="stat-val" id="statPrice">--</div></div>
+          <div class="stat-box"><div class="stat-label">Today</div><div class="stat-val" id="statChange">--</div></div>
+          <div class="stat-box"><div class="stat-label">7-Day Range</div><div class="stat-val" id="statRange">--</div></div>
+          <div class="stat-box"><div class="stat-label">Volume</div><div class="stat-val" id="statVol">--</div></div>
+        </div>
+        <div class="chart-wrap" id="chartContainer">Loading 7-day chart...</div>
+      </div>
+      <div class="modal-footer">
+        <span style="color:var(--muted);font-size:0.8rem;">Click outside or Close to return</span>
+        <div style="display:flex;gap:14px;">
+          <a id="yahooLink" class="ext-link" href="#" target="_blank" rel="noopener">Yahoo Finance ↗</a>
+          <a id="tvLink" class="ext-link" href="#" target="_blank" rel="noopener">TradingView ↗</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const REFRESH_MS = 900000;
     const MIN_PRICE = 5.00;
@@ -475,6 +532,77 @@
     refreshBtn.addEventListener("click", fetchLiveMovers);
     fetchLiveMovers();
     setInterval(fetchLiveMovers, REFRESH_MS);
+        const stockModal = document.getElementById("stockModal");
+    document.getElementById("closeModalBtn").addEventListener("click", () => stockModal.classList.remove("open"));
+    stockModal.addEventListener("click", e => { if (e.target === stockModal) stockModal.classList.remove("open"); });
+
+    function draw7DaySvg(points, isPos) {
+      const box = document.getElementById("chartContainer");
+      if (!points || points.length < 2) {
+        box.innerHTML = '<div style="color:var(--muted);padding:35px 0;text-align:center;">7-day intraday history unavailable on free key — use Yahoo Finance or TradingView below.</div>';
+        return;
+      }
+      const w = 680, h = 200, padL = 52, padR = 14, padT = 16, padB = 24;
+      const vals = points.map(p => p.close);
+      const minP = Math.min.apply(null, vals), maxP = Math.max.apply(null, vals);
+      const span = (maxP - minP) || 1;
+      const xFor = i => padL + (i / (points.length - 1)) * (w - padL - padR);
+      const yFor = v => padT + (1 - (v - minP) / span) * (h - padT - padB);
+      const pts = points.map((p, i) => `${xFor(i).toFixed(1)},${yFor(p.close).toFixed(1)}`).join(" ");
+      const color = isPos ? "#10b981" : "#ef4444";
+      box.innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block;">
+        <text x="4" y="${padT + 4}" fill="#9ca3af" font-size="11" font-family="monospace">$${maxP.toFixed(2)}</text>
+        <text x="4" y="${h - padB}" fill="#9ca3af" font-size="11" font-family="monospace">$${minP.toFixed(2)}</text>
+        <polyline fill="none" stroke="${color}" stroke-width="2.4" points="${pts}" />
+      </svg>`;
+    }
+
+    async function showStockPopup(sym) {
+      const all = currentGainers.concat(currentLosers);
+      const item = all.find(x => x.symbol === sym);
+      if (!item) return;
+
+      document.getElementById("modalTitle").textContent = `${sym} — ${item.name}`;
+      document.getElementById("statPrice").textContent = `$${item.price.toFixed(2)}`;
+      const sign = item.change >= 0 ? "+" : "";
+      const moveEl = document.getElementById("statChange");
+      moveEl.textContent = `${sign}$${item.change.toFixed(2)} (${sign}${item.percentChange.toFixed(2)}%)`;
+      moveEl.style.color = item.percentChange >= 0 ? "var(--green)" : "var(--red)";
+      document.getElementById("statRange").textContent = "Loading...";
+      document.getElementById("statVol").textContent = formatVol(item.volume);
+      document.getElementById("yahooLink").href = "https://yahoo.com" + encodeURIComponent(sym);
+      document.getElementById("tvLink").href = "https://tradingview.com" + encodeURIComponent(sym);
+      document.getElementById("chartContainer").innerHTML = '<div style="color:var(--muted);padding:35px 0;text-align:center;">Loading 7-day chart...</div>';
+      stockModal.classList.add("open");
+
+      try {
+        const key = fmpKeyInput.value.trim();
+        const from = new Date(Date.now() - 8 * 86400000).toISOString().slice(0, 10);
+        const url = "https://financialmodelingprep.com" + "/stable/historical-chart/1hour?symbol=" + encodeURIComponent(sym) + "&from=" + from + "&apikey=" + encodeURIComponent(key);
+        const raw = await safeFetchJson(url);
+        if (Array.isArray(raw) && raw.length >= 2) {
+          const ordered = raw.slice().reverse().map(p => ({ close: parseNum(p.close) })).filter(p => p.close > 0);
+          const vals = ordered.map(p => p.close);
+          document.getElementById("statRange").textContent = `$${Math.min.apply(null, vals).toFixed(2)} – $${Math.max.apply(null, vals).toFixed(2)}`;
+          draw7DaySvg(ordered, ordered.at(-1).close >= ordered.at(0).close);
+        } else {
+          document.getElementById("statRange").textContent = "N/A";
+          draw7DaySvg(Array.of(), item.percentChange >= 0);
+        }
+      } catch (e) {
+        document.getElementById("statRange").textContent = "N/A";
+        draw7DaySvg(Array.of(), item.percentChange >= 0);
+      }
+    }
+
+    document.addEventListener("click", e => {
+      const tickerEl = e.target.closest(".ticker, .ticker-btn");
+      if (tickerEl) {
+        const sym = tickerEl.textContent.trim();
+        if (sym) showStockPopup(sym);
+      }
+    });
+
   </script>
 </body>
 </html>
