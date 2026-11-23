@@ -40,9 +40,9 @@
     .live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); display: inline-block; box-shadow: 0 0 8px var(--green); }
     .subtitle { color: var(--muted); font-size: 0.86rem; margin-top: 4px; }
     .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    select, input {
+    input {
       background: var(--card); border: 1px solid var(--border); color: var(--text);
-      padding: 8px 12px; border-radius: 6px; font-size: 0.88rem;
+      padding: 8px 12px; border-radius: 6px; font-size: 0.88rem; width: 260px;
     }
     button {
       background: var(--accent); color: #090d16; border: none;
@@ -88,17 +88,13 @@
     </div>
 
     <div class="controls">
-      <select id="sourceSelect">
-        <option value="auto">Source: Yahoo Finance + Finviz (No Key)</option>
-        <option value="fmp">Source: Financial Modeling Prep (Free Key)</option>
-      </select>
-      <input type="text" id="fmpKeyInput" placeholder="Paste your FMP API Key..." style="display:none;" />
+      <input type="text" id="fmpKeyInput" placeholder="Paste your FMP API Key..." />
       <button id="refreshBtn">Update Live Quotes</button>
     </div>
   </header>
 
   <div class="status-bar">
-    <span id="statusText">Connecting to live market feed...</span>
+    <span id="statusText">Connecting to Financial Modeling Prep...</span>
     <span id="lastUpdated">Last updated: --:--:--</span>
   </div>
 
@@ -151,7 +147,6 @@
   </main>
   <script>
     const REFRESH_MS = 60000;
-    const sourceSelect = document.getElementById("sourceSelect");
     const fmpKeyInput = document.getElementById("fmpKeyInput");
     const refreshBtn = document.getElementById("refreshBtn");
     const gainersBody = document.getElementById("gainersBody");
@@ -162,22 +157,14 @@
     const savedFmpKey = localStorage.getItem("fmp_api_key");
     if (savedFmpKey) fmpKeyInput.value = savedFmpKey;
 
-    sourceSelect.addEventListener("change", () => {
-      fmpKeyInput.style.display = sourceSelect.value === "fmp" ? "inline-block" : "none";
-      fetchLiveMovers();
-    });
-
     function parseNum(val) {
       if (typeof val === "number") return val;
       if (!val) return 0;
       return Number(String(val).replace(/[$,%+()]/g, "").replace(/,/g, "")) || 0;
     }
 
-    function formatVol(volStr) {
-      if (!volStr) return "--";
-      const s = String(volStr).trim();
-      if (/[BMK]$/i.test(s)) return s;
-      const n = parseNum(s);
+    function formatVol(vol) {
+      const n = parseNum(vol);
       if (!n) return "--";
       if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
       if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
@@ -213,162 +200,52 @@
       }).join("");
     }
 
-    async function fetchTextViaProxies(targetUrl) {
-      const p1 = "https://allorigins.win" + "/get?url=" + encodeURIComponent(targetUrl);
-      const p2 = "https://codetabs.com" + "/v1/proxy?quest=" + encodeURIComponent(targetUrl);
-      const proxyUrls = Array.of(p1, p2);
-      let lastErr;
-
-      for (const proxyUrl of proxyUrls) {
-        try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 10000);
-          const res = await fetch(proxyUrl, { signal: controller.signal });
-          clearTimeout(timer);
-          if (!res.ok) throw new Error("HTTP " + res.status);
-          const text = await res.text();
-          if (text.trim().startsWith("{")) {
-            try {
-              const parsed = JSON.parse(text);
-              if (parsed && typeof parsed.contents === "string" && parsed.contents.length > 50) {
-                return parsed.contents;
-              }
-            } catch (e) {}
-          }
-          if (text.length > 50) return text;
-        } catch (err) {
-          lastErr = err;
-        }
-      }
-      throw lastErr || new Error("Proxy connection failed");
-    }
-
-    function parseYahooHtml(htmlString) {
-      const doc = new DOMParser().parseFromString(htmlString, "text/html");
-      const rows = Array.from(doc.querySelectorAll("table tr"));
-      const items = Array.of();
-
-      for (const tr of rows) {
-        const cells = Array.from(tr.querySelectorAll("td"));
-        if (cells.length < 5) continue;
-        const rawSym = (cells.at(0).textContent || "").trim().split(/\s+/).at(0);
-        if (!rawSym || !/^[A-Z]{1,5}(\.[A-Z])?$/.test(rawSym)) continue;
-
-        const nameText = (cells.at(1).textContent || "").trim();
-        let priceVal = 0, chgVal = 0, pctVal = 0, volText = "--";
-
-        for (let idx = 2; idx < cells.length; idx++) {
-          const txt = (cells.at(idx).textContent || "").trim();
-          if (!priceVal && /^\$?\d[\d,]*\.\d+$/.test(txt.split(/\s+/).at(0))) {
-            priceVal = parseNum(txt.split(/\s+/).at(0));
-          } else if (txt.includes("%")) {
-            pctVal = parseNum(txt);
-          } else if (/^[+-]\d[\d,]*\.\d+$/.test(txt)) {
-            chgVal = parseNum(txt);
-          } else if (/^\d[\d.,]*[BMK]$/i.test(txt) || /^\d{1,3}(,\d{3})+$/.test(txt)) {
-            volText = txt;
-          }
-        }
-
-        if (priceVal > 0 && pctVal !== 0) {
-          if (!chgVal) chgVal = priceVal - (priceVal / (1 + pctVal / 100));
-          items.push({ symbol: rawSym, name: nameText || rawSym, price: priceVal, change: chgVal, percentChange: pctVal, volume: volText });
-        }
-        if (items.length >= 15) break;
-      }
-      return items;
-    }
-
-    function parseFinvizHtml(htmlString) {
-      const doc = new DOMParser().parseFromString(htmlString, "text/html");
-      const rows = Array.from(doc.querySelectorAll("tr"));
-      const items = Array.of();
-
-      for (const tr of rows) {
-        const cells = Array.from(tr.querySelectorAll("td"));
-        if (cells.length < 10) continue;
-        const rankTxt = (cells.at(0).textContent || "").trim();
-        const symTxt = (cells.at(1).textContent || "").trim();
-        if (!/^\d+$/.test(rankTxt) || !/^[A-Z]{1,5}$/.test(symTxt)) continue;
-
-        const nameTxt = (cells.at(2).textContent || "").trim();
-        const priceVal = parseNum(cells.at(8).textContent);
-        const pctVal = parseNum(cells.at(9).textContent);
-        const volTxt = (cells.at(10) ? cells.at(10).textContent : "--").trim();
-        const chgVal = priceVal ? priceVal - (priceVal / (1 + pctVal / 100)) : 0;
-
-        if (priceVal > 0) {
-          items.push({ symbol: symTxt, name: nameTxt || symTxt, price: priceVal, change: chgVal, percentChange: pctVal, volume: volTxt });
-        }
-        if (items.length >= 15) break;
-      }
-      return items;
-    }
-
-    async function fetchFromYahoo() {
-      const base = "https://yahoo.com";
-      const pair = await Promise.all(Array.of(
-        fetchTextViaProxies(base + "/markets/stocks/gainers/"),
-        fetchTextViaProxies(base + "/markets/stocks/losers/")
-      ));
-      const gainers = parseYahooHtml(pair.at(0));
-      const losers = parseYahooHtml(pair.at(1));
-      if (!gainers.length && !losers.length) throw new Error("Yahoo layout unavailable");
-      return { gainers: gainers, losers: losers, label: "Live feed: Yahoo Finance US Markets" };
-    }
-
-    async function fetchFromFinviz() {
-      const base = "https://finviz.com";
-      const pair = await Promise.all(Array.of(
-        fetchTextViaProxies(base + "/screener.ashx?v=111&s=ta_topgainers&f=sh_price_o1,sh_curvol_o100"),
-        fetchTextViaProxies(base + "/screener.ashx?v=111&s=ta_toplosers&f=sh_price_o1,sh_curvol_o100")
-      ));
-      const gainers = parseFinvizHtml(pair.at(0));
-      const losers = parseFinvizHtml(pair.at(1));
-      if (!gainers.length && !losers.length) throw new Error("Finviz screener unavailable");
-      return { gainers: gainers, losers: losers, label: "Live feed: Finviz US Intraday Screener" };
-    }
-
-    async function fetchFromFMP() {
-      const key = fmpKeyInput.value.trim();
-      if (!key) throw new Error("Enter your free Financial Modeling Prep API key");
-      localStorage.setItem("fmp_api_key", key);
-      const base = "https://financialmodelingprep.com";
-      const pair = await Promise.all(Array.of(
-        fetch(base + "/stable/biggest-gainers?apikey=" + encodeURIComponent(key)),
-        fetch(base + "/stable/biggest-losers?apikey=" + encodeURIComponent(key))
-      ));
-      const gJson = await pair.at(0).json();
-      const lJson = await pair.at(1).json();
-      if (gJson["Error Message"] || lJson["Error Message"]) throw new Error(gJson["Error Message"] || lJson["Error Message"]);
-      const mapFmp = arr => (Array.isArray(arr) ? arr : Array.of()).map(item => ({
-        symbol: item.symbol, name: item.name, price: item.price, change: item.change, percentChange: item.changesPercentage, volume: item.volume || 0
-      }));
-      return { gainers: mapFmp(gJson), losers: mapFmp(lJson), label: "Live feed: Financial Modeling Prep (FMP)" };
-    }
-
     async function fetchLiveMovers() {
       const now = new Date();
-      statusText.textContent = "Fetching live US market quotes...";
+      const key = fmpKeyInput.value.trim();
+
+      if (!key) {
+        statusText.textContent = "Please paste your Financial Modeling Prep API key above and click Update Live Quotes.";
+        gainersBody.innerHTML = '<tr><td colspan="7" style="color: var(--muted);">Waiting for API key...</td></tr>';
+        losersBody.innerHTML = '<tr><td colspan="7" style="color: var(--muted);">Waiting for API key...</td></tr>';
+        return;
+      }
+
+      localStorage.setItem("fmp_api_key", key);
+      statusText.textContent = "Fetching live US market quotes from FMP...";
+
       try {
-        let result;
-        if (sourceSelect.value === "fmp") {
-          result = await fetchFromFMP();
-        } else {
-          try {
-            result = await fetchFromYahoo();
-          } catch (e) {
-            result = await fetchFromFinviz();
-          }
+        const base = "https://financialmodelingprep.com";
+        const pair = await Promise.all(Array.of(
+          fetch(base + "/stable/biggest-gainers?apikey=" + encodeURIComponent(key)),
+          fetch(base + "/stable/biggest-losers?apikey=" + encodeURIComponent(key))
+        ));
+
+        const gJson = await pair.at(0).json();
+        const lJson = await pair.at(1).json();
+
+        if (gJson["Error Message"] || lJson["Error Message"]) {
+          throw new Error(gJson["Error Message"] || lJson["Error Message"]);
         }
-        renderRows(gainersBody, result.gainers, true);
-        renderRows(losersBody, result.losers, false);
-        statusText.textContent = result.label;
+
+        const mapFmp = arr => (Array.isArray(arr) ? arr : Array.of()).map(item => ({
+          symbol: item.symbol,
+          name: item.name,
+          price: item.price,
+          change: item.change,
+          percentChange: item.changesPercentage,
+          volume: item.volume || 0
+        }));
+
+        renderRows(gainersBody, mapFmp(gJson), true);
+        renderRows(losersBody, mapFmp(lJson), false);
+        statusText.textContent = "Live feed: Financial Modeling Prep (FMP)";
       } catch (err) {
         statusText.textContent = "Feed error: " + err.message;
         gainersBody.innerHTML = '<tr><td colspan="7" style="color: var(--red);">Unable to load: ' + err.message + '</td></tr>';
         losersBody.innerHTML = '<tr><td colspan="7" style="color: var(--red);">Unable to load: ' + err.message + '</td></tr>';
       }
+
       lastUpdated.textContent = "Last updated: " + now.toLocaleTimeString();
     }
 
