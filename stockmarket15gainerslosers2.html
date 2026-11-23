@@ -211,19 +211,28 @@
       }).join("");
     }
 
-    async function fetchViaProxies(targetUrl) {
-      const proxies = Array.of(
-        url => "https://codetabs.com" + encodeURIComponent(url),
-        url => "https://allorigins.win" + encodeURIComponent(url),
-        url => "https://corsproxy.io" + encodeURIComponent(url)
-      );
+    function buildProxyList(targetUrl) {
+      const u1 = new URL("https://codetabs.com");
+      u1.searchParams.set("quest", targetUrl);
 
+      const u2 = new URL("https://allorigins.win");
+      u2.searchParams.set("url", targetUrl);
+
+      const u3 = new URL("https://corsproxy.io");
+      u3.searchParams.set("url", targetUrl);
+
+      return Array.of(u1.toString(), u2.toString(), u3.toString());
+    }
+
+    async function fetchViaProxies(targetUrl) {
+      const proxyUrls = buildProxyList(targetUrl);
       let lastErr;
-      for (const makeUrl of proxies) {
+
+      for (const proxyUrl of proxyUrls) {
         try {
           const controller = new AbortController();
           const timer = setTimeout(() => controller.abort(), 8000);
-          const res = await fetch(makeUrl(targetUrl), { signal: controller.signal });
+          const res = await fetch(proxyUrl, { signal: controller.signal });
           clearTimeout(timer);
           if (!res.ok) throw new Error("HTTP " + res.status);
           const raw = await res.json();
@@ -236,13 +245,20 @@
     }
 
     async function fetchFromYahoo() {
-      const cacheBust = "&_t=" + Date.now();
-      const gUrl = "https://yahoo.com" + cacheBust;
-      const lUrl = "https://yahoo.com" + cacheBust;
+      const makeYahooUrl = (scrId) => {
+        const u = new URL("https://yahoo.com");
+        u.searchParams.set("formatted", "false");
+        u.searchParams.set("lang", "en-US");
+        u.searchParams.set("region", "US");
+        u.searchParams.set("scrIds", scrId);
+        u.searchParams.set("count", "15");
+        u.searchParams.set("_t", String(Date.now()));
+        return u.toString();
+      };
 
       const pair = await Promise.all(Array.of(
-        fetchViaProxies(gUrl),
-        fetchViaProxies(lUrl)
+        fetchViaProxies(makeYahooUrl("day_gainers")),
+        fetchViaProxies(makeYahooUrl("day_losers"))
       ));
 
       const mapYahoo = json => {
@@ -272,7 +288,10 @@
     }
 
     async function fetchFromNasdaq() {
-      const json = await fetchViaProxies("https://nasdaq.com");
+      const u = new URL("https://nasdaq.com");
+      u.searchParams.set("assetclass", "stocks");
+
+      const json = await fetchViaProxies(u.toString());
       const stocks = json && json.data && json.data.STOCKS;
       if (!stocks) throw new Error("Nasdaq payload unavailable");
 
@@ -297,9 +316,15 @@
       if (!key) throw new Error("Enter your free Financial Modeling Prep API key");
       localStorage.setItem("fmp_api_key", key);
 
+      const gUrl = new URL("https://financialmodelingprep.com");
+      gUrl.searchParams.set("apikey", key);
+
+      const lUrl = new URL("https://financialmodelingprep.com");
+      lUrl.searchParams.set("apikey", key);
+
       const pair = await Promise.all(Array.of(
-        fetch("https://financialmodelingprep.com" + encodeURIComponent(key)),
-        fetch("https://financialmodelingprep.com" + encodeURIComponent(key))
+        fetch(gUrl.toString()),
+        fetch(lUrl.toString())
       ));
 
       const gJson = await pair.at(0).json();
