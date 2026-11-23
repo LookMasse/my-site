@@ -89,7 +89,8 @@
 
     <div class="controls">
       <select id="sourceSelect">
-        <option value="scanner">Source: NYSE/NASDAQ Live Scanner (No Key)</option>
+        <option value="yahoo">Source: Yahoo Finance Live (No Key)</option>
+        <option value="nasdaq">Source: Nasdaq Live (No Key)</option>
         <option value="fmp">Source: Financial Modeling Prep (Free Key)</option>
       </select>
       <input type="text" id="fmpKeyInput" placeholder="Paste your FMP API Key..." style="display:none;" />
@@ -98,7 +99,7 @@
   </header>
 
   <div class="status-bar">
-    <span id="statusText">Connecting to live market feed...</span>
+    <span id="statusText">Connecting to Yahoo Finance live feed...</span>
     <span id="lastUpdated">Last updated: --:--:--</span>
   </div>
 
@@ -210,55 +211,85 @@
       }).join("");
     }
 
-    async function fetchFromDirectScanner() {
-      const runQuery = async (sortOrder) => {
-        const payload = {
-          filter: Array.of(
-            { left: "exchange", operation: "in_range", right: Array.of("NYSE", "NASDAQ") },
-            { left: "close", operation: "greater", right: 1 },
-            { left: "volume", operation: "greater", right: 100000 }
-          ),
-          options: { lang: "en" },
-          symbols: { query: { types: Array.of("stock") }, tickers: Array.of() },
-          columns: Array.of("name", "description", "close", "change_abs", "change", "volume"),
-          sort: { sortBy: "change", sortOrder: sortOrder },
-          range: Array.of(0, 15)
-        };
+    async function fetchViaProxies(targetUrl) {
+      const proxies = Array.of(
+        url => "https://codetabs.com" + encodeURIComponent(url),
+        url => "https://allorigins.win" + encodeURIComponent(url),
+        url => "https://corsproxy.io" + encodeURIComponent(url)
+      );
 
-        const res = await fetch("https://tradingview.com", {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=UTF-8" },
-          body: JSON.stringify(payload)
-        });
+      let lastErr;
+      for (const makeUrl of proxies) {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 8000);
+          const res = await fetch(makeUrl(targetUrl), { signal: controller.signal });
+          clearTimeout(timer);
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const raw = await res.json();
+          return typeof raw.contents === "string" ? JSON.parse(raw.contents) : raw;
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+      throw lastErr || new Error("Proxy connection failed");
+    }
 
-        if (!res.ok) throw new Error("Scanner HTTP " + res.status);
-        const json = await res.json();
-        const rows = Array.isArray(json.data) ? json.data : Array.of();
+    async function fetchFromYahoo() {
+      const cacheBust = "&_t=" + Date.now();
+      const gUrl = "https://yahoo.com" + cacheBust;
+      const lUrl = "https://yahoo.com" + cacheBust;
 
-        return rows.map(row => {
-          const d = Array.isArray(row.d) ? row.d : Array.of();
-          return {
-            symbol: d.at(0) || "",
-            name: d.at(1) || d.at(0) || "",
-            price: d.at(2) || 0,
-            change: d.at(3) || 0,
-            percentChange: d.at(4) || 0,
-            volume: d.at(5) || 0
-          };
-        });
+      const pair = await Promise.all(Array.of(
+        fetchViaProxies(gUrl),
+        fetchViaProxies(lUrl)
+      ));
+
+      const mapYahoo = json => {
+        const resultList = json && json.finance && json.finance.result;
+        const firstResult = Array.isArray(resultList) ? resultList.at(0) : null;
+        const quotes = (firstResult && Array.isArray(firstResult.quotes)) ? firstResult.quotes : Array.of();
+        return quotes.map(q => ({
+          symbol: q.symbol,
+          name: q.shortName || q.longName || q.symbol,
+          price: q.regularMarketPrice,
+          change: q.regularMarketChange,
+          percentChange: q.regularMarketChangePercent,
+          volume: q.regularMarketVolume
+        }));
       };
 
-      const pair = await Promise.all(Array.of(runQuery("desc"), runQuery("asc")));
-      const gainers = pair.at(0);
-      const losers = pair.at(1);
+      const gainers = mapYahoo(pair.at(0));
+      const losers = mapYahoo(pair.at(1));
 
-      if (!gainers.length && !losers.length) throw new Error("Empty scanner feed");
+      if (!gainers.length && !losers.length) throw new Error("Yahoo returned empty list");
 
       return {
         gainers: gainers,
         losers: losers,
-        label: "Live feed: US Intraday Market Scanner (Direct NYSE / NASDAQ)"
+        label: "Live feed: Yahoo Finance US Intraday Screener"
       };
+    }
+
+    async function fetchFromNasdaq() {
+      const json = await fetchViaProxies("https://nasdaq.com");
+      const stocks = json && json.data && json.data.STOCKS;
+      if (!stocks) throw new Error("Nasdaq payload unavailable");
+
+      const mapRows = rows => (Array.isArray(rows) ? rows : Array.of()).map(r => ({
+        symbol: r.symbol,
+        name: r.name,
+        price: r.lastSalePrice,
+        change: r.netChange,
+        percentChange: r.percentageChange,
+        volume: r.volume
+      }));
+
+      const gainers = mapRows(stocks.MostAdvanced && stocks.MostAdvanced.table && stocks.MostAdvanced.table.rows);
+      const losers = mapRows(stocks.MostDeclined && stocks.MostDeclined.table && stocks.MostDeclined.table.rows);
+
+      if (!gainers.length && !losers.length) throw new Error("Empty Nasdaq rows");
+      return { gainers: gainers, losers: losers, label: "Live feed: Nasdaq Market Movers" };
     }
 
     async function fetchFromFMP() {
@@ -292,12 +323,23 @@
 
     async function fetchLiveMovers() {
       const now = new Date();
+      const mode = sourceSelect.value;
       statusText.textContent = "Fetching live US market quotes...";
 
       try {
-        const result = sourceSelect.value === "fmp"
-          ? await fetchFromFMP()
-          : await fetchFromDirectScanner();
+        let result;
+        if (mode === "fmp") {
+          result = await fetchFromFMP();
+        } else if (mode === "nasdaq") {
+          result = await fetchFromNasdaq();
+        } else {
+          try {
+            result = await fetchFromYahoo();
+          } catch (yahooErr) {
+            console.warn("Yahoo proxy failed, falling back to Nasdaq:", yahooErr);
+            result = await fetchFromNasdaq();
+          }
+        }
 
         renderRows(gainersBody, result.gainers, true);
         renderRows(losersBody, result.losers, false);
@@ -319,4 +361,3 @@
   </script>
 </body>
 </html>
-
