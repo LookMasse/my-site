@@ -1,5 +1,29 @@
   <script>
-    function formatVol(n) {
+    const REFRESH_MS = 60000;
+    const sourceSelect = document.getElementById("sourceSelect");
+    const fmpKeyInput = document.getElementById("fmpKeyInput");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const gainersBody = document.getElementById("gainersBody");
+    const losersBody = document.getElementById("losersBody");
+    const statusText = document.getElementById("statusText");
+    const lastUpdated = document.getElementById("lastUpdated");
+
+    const savedFmpKey = localStorage.getItem("fmp_api_key");
+    if (savedFmpKey) fmpKeyInput.value = savedFmpKey;
+
+    sourceSelect.addEventListener("change", () => {
+      fmpKeyInput.style.display = sourceSelect.value === "fmp" ? "inline-block" : "none";
+      fetchLiveMovers();
+    });
+
+    function parseNum(val) {
+      if (typeof val === "number") return val;
+      if (!val) return 0;
+      return Number(String(val).replace(/[$,%+]/g, "").replace(/,/g, "")) || 0;
+    }
+
+    function formatVol(vol) {
+      const n = parseNum(vol);
       if (!n) return "--";
       if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
       if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
@@ -7,74 +31,140 @@
       return n.toLocaleString("en-US");
     }
 
-    function render(tbody, rows, isGain) {
-      tbody.innerHTML = rows.map((r, i) => `
-        <tr>
-          <td style="color:var(--muted)">${i + 1}</td>
-          <td class="ticker">${r.symbol}</td>
-          <td class="company" title="${r.name}">${r.name}</td>
-          <td class="num">$${r.price.toFixed(2)}</td>
-          <td class="num">${r.change >= 0 ? "+" : ""}${r.change.toFixed(2)}</td>
-          <td class="num"><span class="pill ${isGain ? "pill-gain" : "pill-loss"}">${r.pct >= 0 ? "+" : ""}${r.pct.toFixed(2)}%</span></td>
-          <td class="num">${formatVol(r.volume)}</td>
-        </tr>
-      `).join("");
+    function renderRows(tbody, list, isGainer) {
+      if (!list || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="color: var(--muted);">No live quotes returned.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = list.slice(0, 15).map((item, i) => {
+        const price = parseNum(item.price).toFixed(2);
+        const chg = parseNum(item.change);
+        const pct = parseNum(item.percentChange);
+        const chgStr = (chg >= 0 ? "+" : "") + chg.toFixed(2);
+        const pctStr = (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%";
+        const pillClass = isGainer ? "pill-gain" : "pill-loss";
+
+        return `
+          <tr>
+            <td class="rank">${i + 1}</td>
+            <td class="ticker">${item.symbol}</td>
+            <td class="company" title="${item.name || ""}">${item.name || "-"}</td>
+            <td class="num">$${price}</td>
+            <td class="num">${chgStr}</td>
+            <td class="num"><span class="pill ${pillClass}">${pctStr}</span></td>
+            <td class="num">${formatVol(item.volume)}</td>
+          </tr>
+        `;
+      }).join("");
     }
 
-    async function queryScanner(sortOrder) {
-      const payload = {
-        filter: [
-          { left: "exchange", operation: "in_range", right: ["NYSE", "NASDAQ"] },
-          { left: "close", operation: "greater", right: 1 },
-          { left: "volume", operation: "greater", right: 100000 }
-        ],
-        options: { lang: "en" },
-        symbols: { query: { types: ["stock"] }, tickers: [] },
-        columns: ["name", "description", "close", "change_abs", "change", "volume"],
-        sort: { sortBy: "change", sortOrder: sortOrder },
-        range: [0, 15]
+    async function fetchFromDirectScanner() {
+      const runQuery = async (sortOrder) => {
+        const payload = {
+          filter: Array.of(
+            { left: "exchange", operation: "in_range", right: Array.of("NYSE", "NASDAQ") },
+            { left: "close", operation: "greater", right: 1 },
+            { left: "volume", operation: "greater", right: 100000 }
+          ),
+          options: { lang: "en" },
+          symbols: { query: { types: Array.of("stock") }, tickers: Array.of() },
+          columns: Array.of("name", "description", "close", "change_abs", "change", "volume"),
+          sort: { sortBy: "change", sortOrder: sortOrder },
+          range: Array.of(0, 15)
+        };
+
+        const res = await fetch("https://tradingview.com", {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=UTF-8" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error("Scanner HTTP " + res.status);
+        const json = await res.json();
+        const rows = Array.isArray(json.data) ? json.data : Array.of();
+
+        return rows.map(row => {
+          const d = Array.isArray(row.d) ? row.d : Array.of();
+          return {
+            symbol: d.at(0) || "",
+            name: d.at(1) || d.at(0) || "",
+            price: d.at(2) || 0,
+            change: d.at(3) || 0,
+            percentChange: d.at(4) || 0,
+            volume: d.at(5) || 0
+          };
+        });
       };
 
-      const res = await fetch("https://tradingview.com", {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=UTF-8" },
-        body: JSON.stringify(payload)
-      });
+      const pair = await Promise.all(Array.of(runQuery("desc"), runQuery("asc")));
+      const gainers = pair.at(0);
+      const losers = pair.at(1);
 
-      if (!res.ok) throw new Error("Scanner HTTP " + res.status);
-      const raw = await res.json();
+      if (!gainers.length && !losers.length) throw new Error("Empty scanner feed");
 
-      return (raw.data || []).map(item => {
-        const d = item.d || [];
-        return {
-          symbol: d[0],
-          name: d[1] || d[0],
-          price: Number(d[2] || 0),
-          change: Number(d[3] || 0),
-          pct: Number(d[4] || 0),
-          volume: Number(d[5] || 0)
-        };
-      });
+      return {
+        gainers: gainers,
+        losers: losers,
+        label: "Live feed: US Intraday Market Scanner (Direct NYSE / NASDAQ)"
+      };
     }
 
-    async function loadMovers() {
-      const status = document.getElementById("statusText");
-      try {
-        const [gainers, losers] = await Promise.all([
-          queryScanner("desc"),
-          queryScanner("asc")
-        ]);
-        render(document.getElementById("gainersBody"), gainers, true);
-        render(document.getElementById("losersBody"), losers, false);
-        status.textContent = "Live feed: NYSE & NASDAQ Intraday Scanner";
-      } catch (err) {
-        status.textContent = "Error: " + err.message;
+    async function fetchFromFMP() {
+      const key = fmpKeyInput.value.trim();
+      if (!key) throw new Error("Enter your free Financial Modeling Prep API key");
+      localStorage.setItem("fmp_api_key", key);
+
+      const pair = await Promise.all(Array.of(
+        fetch("https://financialmodelingprep.com" + encodeURIComponent(key)),
+        fetch("https://financialmodelingprep.com" + encodeURIComponent(key))
+      ));
+
+      const gJson = await pair.at(0).json();
+      const lJson = await pair.at(1).json();
+
+      if (gJson["Error Message"] || lJson["Error Message"]) {
+        throw new Error(gJson["Error Message"] || lJson["Error Message"]);
       }
-      document.getElementById("lastUpdated").textContent = "Last updated: " + new Date().toLocaleTimeString();
+
+      const mapFmp = arr => (Array.isArray(arr) ? arr : Array.of()).map(item => ({
+        symbol: item.symbol,
+        name: item.name,
+        price: item.price,
+        change: item.change,
+        percentChange: item.changesPercentage,
+        volume: item.volume || 0
+      }));
+
+      return { gainers: mapFmp(gJson), losers: mapFmp(lJson), label: "Live feed: Financial Modeling Prep (FMP)" };
     }
 
-    loadMovers();
-    setInterval(loadMovers, 30000);
+    async function fetchLiveMovers() {
+      const now = new Date();
+      statusText.textContent = "Fetching live US market quotes...";
+
+      try {
+        const result = sourceSelect.value === "fmp"
+          ? await fetchFromFMP()
+          : await fetchFromDirectScanner();
+
+        renderRows(gainersBody, result.gainers, true);
+        renderRows(losersBody, result.losers, false);
+        statusText.textContent = result.label;
+      } catch (err) {
+        console.error(err);
+        statusText.textContent = "Feed error: " + err.message;
+        gainersBody.innerHTML = '<tr><td colspan="7" style="color: var(--red);">Unable to load: ' + err.message + '</td></tr>';
+        losersBody.innerHTML = '<tr><td colspan="7" style="color: var(--red);">Unable to load: ' + err.message + '</td></tr>';
+      }
+
+      lastUpdated.textContent = "Last updated: " + now.toLocaleTimeString();
+    }
+
+    refreshBtn.addEventListener("click", fetchLiveMovers);
+
+    fetchLiveMovers();
+    setInterval(fetchLiveMovers, REFRESH_MS);
   </script>
 </body>
 </html>
