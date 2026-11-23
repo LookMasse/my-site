@@ -174,8 +174,11 @@
       return Number(String(val).replace(/[$,%+]/g, "").replace(/,/g, "")) || 0;
     }
 
-    function formatVol(vol) {
-      const n = parseNum(vol);
+    function formatVol(volStr) {
+      if (!volStr) return "--";
+      const s = String(volStr).trim();
+      if (/[BMK]$/i.test(s)) return s;
+      const n = parseNum(s);
       if (!n) return "--";
       if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
       if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
@@ -212,31 +215,32 @@
     }
 
     function buildProxyList(targetUrl) {
-      const u1 = new URL("https://codetabs.com");
-      u1.searchParams.set("quest", targetUrl);
+      const u1 = new URL("https://allorigins.win");
+      u1.searchParams.set("url", targetUrl);
 
-      const u2 = new URL("https://allorigins.win");
-      u2.searchParams.set("url", targetUrl);
+      const u2 = new URL("https://codetabs.com");
+      u2.searchParams.set("quest", targetUrl);
 
-      const u3 = new URL("https://corsproxy.io");
-      u3.searchParams.set("url", targetUrl);
-
-      return Array.of(u1.toString(), u2.toString(), u3.toString());
+      return Array.of(u1.toString(), u2.toString());
     }
 
-    async function fetchViaProxies(targetUrl) {
+    async function fetchTextViaProxies(targetUrl) {
       const proxyUrls = buildProxyList(targetUrl);
       let lastErr;
 
       for (const proxyUrl of proxyUrls) {
         try {
           const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 8000);
+          const timer = setTimeout(() => controller.abort(), 10000);
           const res = await fetch(proxyUrl, { signal: controller.signal });
           clearTimeout(timer);
           if (!res.ok) throw new Error("HTTP " + res.status);
-          const raw = await res.json();
-          return typeof raw.contents === "string" ? JSON.parse(raw.contents) : raw;
+          const text = await res.text();
+          if (text.trim().startsWith("{")) {
+            const parsed = JSON.parse(text);
+            if (parsed && typeof parsed.contents === "string") return parsed.contents;
+          }
+          return text;
         } catch (err) {
           lastErr = err;
         }
@@ -244,46 +248,54 @@
       throw lastErr || new Error("Proxy connection failed");
     }
 
-    async function fetchFromYahoo() {
-      const makeYahooUrl = (scrId) => {
-        const u = new URL("https://yahoo.com");
-        u.searchParams.set("formatted", "false");
-        u.searchParams.set("lang", "en-US");
-        u.searchParams.set("region", "US");
-        u.searchParams.set("scrIds", scrId);
-        u.searchParams.set("count", "15");
-        u.searchParams.set("_t", String(Date.now()));
-        return u.toString();
-      };
+    function parseYahooHtml(htmlString) {
+      const doc = new DOMParser().parseFromString(htmlString, "text/html");
+      const rows = Array.from(doc.querySelectorAll("table tbody tr"));
+      const items = Array.of();
 
+      for (const tr of rows) {
+        const cells = Array.from(tr.querySelectorAll("td"));
+        if (cells.length < 6) continue;
+
+        const symbolText = (cells.at(0).textContent || "").trim().split(/\s+/).at(0);
+        const nameText = (cells.at(1).textContent || "").trim();
+        const priceText = (cells.at(3).textContent || cells.at(2).textContent || "").trim().split(/\s+/).at(0);
+        const changeText = (cells.at(4).textContent || "").trim();
+        const pctText = (cells.at(5).textContent || "").trim();
+        const volText = cells.at(6) ? (cells.at(6).textContent || "").trim() : "--";
+
+        if (symbolText && /^[A-Z.\-]{1,6}$/.test(symbolText) && parseNum(priceText) > 0) {
+          items.push({
+            symbol: symbolText,
+            name: nameText || symbolText,
+            price: priceText,
+            change: changeText,
+            percentChange: pctText,
+            volume: volText
+          });
+        }
+        if (items.length >= 15) break;
+      }
+      return items;
+    }
+
+    async function fetchFromYahoo() {
       const pair = await Promise.all(Array.of(
-        fetchViaProxies(makeYahooUrl("day_gainers")),
-        fetchViaProxies(makeYahooUrl("day_losers"))
+        fetchTextViaProxies("https://yahoo.com"),
+        fetchTextViaProxies("https://yahoo.com")
       ));
 
-      const mapYahoo = json => {
-        const resultList = json && json.finance && json.finance.result;
-        const firstResult = Array.isArray(resultList) ? resultList.at(0) : null;
-        const quotes = (firstResult && Array.isArray(firstResult.quotes)) ? firstResult.quotes : Array.of();
-        return quotes.map(q => ({
-          symbol: q.symbol,
-          name: q.shortName || q.longName || q.symbol,
-          price: q.regularMarketPrice,
-          change: q.regularMarketChange,
-          percentChange: q.regularMarketChangePercent,
-          volume: q.regularMarketVolume
-        }));
-      };
+      const gainers = parseYahooHtml(pair.at(0));
+      const losers = parseYahooHtml(pair.at(1));
 
-      const gainers = mapYahoo(pair.at(0));
-      const losers = mapYahoo(pair.at(1));
-
-      if (!gainers.length && !losers.length) throw new Error("Yahoo returned empty list");
+      if (!gainers.length && !losers.length) {
+        throw new Error("Could not parse Yahoo Finance table");
+      }
 
       return {
         gainers: gainers,
         losers: losers,
-        label: "Live feed: Yahoo Finance US Intraday Screener"
+        label: "Live feed: Yahoo Finance US Markets (Gainers & Losers)"
       };
     }
 
@@ -291,7 +303,8 @@
       const u = new URL("https://nasdaq.com");
       u.searchParams.set("assetclass", "stocks");
 
-      const json = await fetchViaProxies(u.toString());
+      const rawText = await fetchTextViaProxies(u.toString());
+      const json = JSON.parse(rawText);
       const stocks = json && json.data && json.data.STOCKS;
       if (!stocks) throw new Error("Nasdaq payload unavailable");
 
@@ -361,7 +374,7 @@
           try {
             result = await fetchFromYahoo();
           } catch (yahooErr) {
-            console.warn("Yahoo proxy failed, falling back to Nasdaq:", yahooErr);
+            console.warn("Yahoo failed, falling back to Nasdaq:", yahooErr);
             result = await fetchFromNasdaq();
           }
         }
@@ -386,3 +399,6 @@
   </script>
 </body>
 </html>
+
+</html>
+
