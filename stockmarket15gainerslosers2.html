@@ -1,3 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live US Stock Movers – Top 15 Gainers &amp; Losers</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card: #111827;
+      --border: #1f2937;
+      --text: #f9fafb;
+      --muted: #9ca3af;
+      --accent: #38bdf8;
+      --green: #10b981;
+      --green-bg: rgba(16, 185, 129, 0.15);
+      --red: #ef4444;
+      --red-bg: rgba(239, 68, 68, 0.15);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 20px;
+      line-height: 1.4;
+    }
+    header {
+      max-width: 1400px;
+      margin: 0 auto 18px auto;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .title-group h1 { font-size: 1.45rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); display: inline-block; box-shadow: 0 0 8px var(--green); }
+    .subtitle { color: var(--muted); font-size: 0.86rem; margin-top: 4px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    select, input {
+      background: var(--card); border: 1px solid var(--border); color: var(--text);
+      padding: 8px 12px; border-radius: 6px; font-size: 0.88rem;
+    }
+    button {
+      background: var(--accent); color: #090d16; border: none;
+      padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 0.88rem; cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+    .status-bar {
+      max-width: 1400px; margin: 0 auto 18px auto; font-size: 0.83rem; color: var(--muted);
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    }
+    .grid { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+    @media (max-width: 1050px) { .grid { grid-template-columns: 1fr; } }
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; }
+    .panel-header {
+      padding: 14px 18px; background: rgba(9, 13, 22, 0.6); border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .panel-header h2 { font-size: 1.05rem; font-weight: 600; }
+    .gainer-title { color: var(--green); }
+    .loser-title { color: var(--red); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { color: var(--muted); font-weight: 600; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    th.num, td.num { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    tr:last-child td { border-bottom: none; }
+    .rank { color: var(--muted); width: 32px; }
+    .ticker { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: var(--accent); }
+    .company { color: var(--muted); font-size: 0.8rem; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-weight: 600; font-size: 0.78rem; }
+    .pill-gain { background: var(--green-bg); color: var(--green); }
+    .pill-loss { background: var(--red-bg); color: var(--red); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="title-group">
+      <h1>
+        <span class="live-dot"></span>
+        <span>Live US Stock Market Movers</span>
+      </h1>
+      <div class="subtitle">Real-time Top 15 Day Gainers &amp; Top 15 Day Losers (Auto-refreshes every 60s)</div>
+    </div>
+
+    <div class="controls">
+      <select id="sourceSelect">
+        <option value="scanner">Source: NYSE/NASDAQ Live Scanner (No Key)</option>
+        <option value="fmp">Source: Financial Modeling Prep (Free Key)</option>
+      </select>
+      <input type="text" id="fmpKeyInput" placeholder="Paste your FMP API Key..." style="display:none;" />
+      <button id="refreshBtn">Update Live Quotes</button>
+    </div>
+  </header>
+
+  <div class="status-bar">
+    <span id="statusText">Connecting to live market feed...</span>
+    <span id="lastUpdated">Last updated: --:--:--</span>
+  </div>
+
+  <main class="grid">
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="gainer-title">Top 15 Day Gainers</h2>
+        <span style="color: var(--muted); font-size: 0.78rem;">Intraday USD</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th class="rank">#</th>
+            <th>Symbol</th>
+            <th>Company</th>
+            <th class="num">Price</th>
+            <th class="num">Change</th>
+            <th class="num">% Chg</th>
+            <th class="num">Volume</th>
+          </tr>
+        </thead>
+        <tbody id="gainersBody">
+          <tr><td colspan="7">Fetching live gainers...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="loser-title">Top 15 Day Losers</h2>
+        <span style="color: var(--muted); font-size: 0.78rem;">Intraday USD</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th class="rank">#</th>
+            <th>Symbol</th>
+            <th>Company</th>
+            <th class="num">Price</th>
+            <th class="num">Change</th>
+            <th class="num">% Chg</th>
+            <th class="num">Volume</th>
+          </tr>
+        </thead>
+        <tbody id="losersBody">
+          <tr><td colspan="7">Fetching live losers...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
   <script>
     const REFRESH_MS = 60000;
     const sourceSelect = document.getElementById("sourceSelect");
@@ -168,3 +319,4 @@
   </script>
 </body>
 </html>
+
