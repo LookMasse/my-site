@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Live US Stock Movers – Top 50 Gainers &amp; Losers ($5+)</title>
+  <title>Live US Stock Movers – NYSE, NASDAQ &amp; S&amp;P 500 ($5+)</title>
   <style>
     :root {
       --bg: #090d16;
@@ -41,10 +41,11 @@
     .live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); display: inline-block; box-shadow: 0 0 8px var(--green); }
     .subtitle { color: var(--muted); font-size: 0.86rem; margin-top: 4px; }
     .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    input {
+    select, input {
       background: var(--card); border: 1px solid var(--border); color: var(--text);
-      padding: 8px 12px; border-radius: 6px; font-size: 0.88rem; width: 220px;
+      padding: 8px 12px; border-radius: 6px; font-size: 0.88rem;
     }
+    input { width: 210px; }
     button {
       background: var(--accent); color: #090d16; border: none;
       padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 0.88rem; cursor: pointer;
@@ -70,12 +71,19 @@
     .loser-title { color: var(--red); }
     table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
     th, td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
-    th { color: var(--muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    th {
+      color: var(--muted); font-weight: 600; font-size: 0.72rem;
+      text-transform: uppercase; letter-spacing: 0.04em; user-select: none;
+    }
+    th.sortable { cursor: pointer; transition: color 0.15s; }
+    th.sortable:hover { color: var(--text); }
+    th.active-sort { color: var(--accent); }
     th.num, td.num { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     tr:last-child td { border-bottom: none; }
     .rank { color: var(--muted); width: 30px; }
     .ticker { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: var(--accent); }
-    .company { color: var(--muted); font-size: 0.78rem; max-width: 135px; overflow: hidden; text-overflow: ellipsis; }
+    .exch-tag { font-size: 0.68rem; color: var(--muted); margin-left: 4px; }
+    .company { color: var(--muted); font-size: 0.78rem; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
     .after-hrs { color: var(--amber); font-size: 0.82rem; }
     .pill { display: inline-block; padding: 2px 7px; border-radius: 999px; font-weight: 600; font-size: 0.76rem; }
     .pill-gain { background: var(--green-bg); color: var(--green); }
@@ -90,10 +98,14 @@
         <span class="live-dot"></span>
         <span>Live US Stock Movers ($5.00+ Only)</span>
       </h1>
-      <div class="subtitle">Top 50 Day Gainers &amp; Top 50 Day Losers + After-Hours Quotes (Updates on open &amp; every 15 min)</div>
+      <div class="subtitle">Top 50 Gainers &amp; Losers across NYSE, NASDAQ &amp; S&amp;P 500 (Click any column header to sort)</div>
     </div>
 
     <div class="controls">
+      <select id="marketFilter">
+        <option value="nyse_nasdaq">NYSE + NASDAQ (incl. S&amp;P 500)</option>
+        <option value="sp500">S&amp;P 500 Only (~500 stocks)</option>
+      </select>
       <input type="password" id="fmpKeyInput" placeholder="Paste your FMP API Key..." />
       <button id="toggleKeyBtn" class="secondary" style="display:none;">Change Key</button>
       <button id="refreshBtn">Update Quotes</button>
@@ -113,15 +125,15 @@
       </div>
       <table>
         <thead>
-          <tr>
+          <tr id="gainersHeader">
             <th class="rank">#</th>
-            <th>Symbol</th>
-            <th>Company</th>
-            <th class="num">Price</th>
-            <th class="num">After-Hrs</th>
-            <th class="num">Change</th>
-            <th class="num">% Chg</th>
-            <th class="num">Volume</th>
+            <th class="sortable" data-key="symbol">Symbol <span class="sort-ind"></span></th>
+            <th class="sortable" data-key="name">Company <span class="sort-ind"></span></th>
+            <th class="num sortable" data-key="price">Price <span class="sort-ind"></span></th>
+            <th class="num sortable" data-key="afterHours">After-Hrs <span class="sort-ind"></span></th>
+            <th class="num sortable" data-key="change">Change <span class="sort-ind"></span></th>
+            <th class="num sortable active-sort" data-key="percentChange">% Chg <span class="sort-ind">▼</span></th>
+            <th class="num sortable" data-key="volume">Volume <span class="sort-ind"></span></th>
           </tr>
         </thead>
         <tbody id="gainersBody">
@@ -137,15 +149,15 @@
       </div>
       <table>
         <thead>
-          <tr>
+          <tr id="losersHeader">
             <th class="rank">#</th>
-            <th>Symbol</th>
-            <th>Company</th>
-            <th class="num">Price</th>
-            <th class="num">After-Hrs</th>
-            <th class="num">Change</th>
-            <th class="num">% Chg</th>
-            <th class="num">Volume</th>
+            <th class="sortable" data-key="symbol">Symbol <span class="sort-ind"></span></th>
+            <th class="sortable" data-key="name">Company <span class="sort-ind"></span></th>
+            <th class="num sortable" data-key="price">Price <span class="sort-ind"></span></th>
+            <th class="num sortable" data-key="afterHours">After-Hrs <span class="sort-ind"></span></th>
+            <th class="num sortable" data-key="change">Change <span class="sort-ind"></span></th>
+            <th class="num sortable active-sort" data-key="percentChange">% Chg <span class="sort-ind">▲</span></th>
+            <th class="num sortable" data-key="volume">Volume <span class="sort-ind"></span></th>
           </tr>
         </thead>
         <tbody id="losersBody">
@@ -155,10 +167,11 @@
     </section>
   </main>
   <script>
-    const REFRESH_MS = 900000; // 15 minutes (15 * 60 * 1000)
+    const REFRESH_MS = 900000;
     const MIN_PRICE = 5.00;
     const MAX_ITEMS = 50;
 
+    const marketFilter = document.getElementById("marketFilter");
     const fmpKeyInput = document.getElementById("fmpKeyInput");
     const toggleKeyBtn = document.getElementById("toggleKeyBtn");
     const refreshBtn = document.getElementById("refreshBtn");
@@ -166,6 +179,15 @@
     const losersBody = document.getElementById("losersBody");
     const statusText = document.getElementById("statusText");
     const lastUpdated = document.getElementById("lastUpdated");
+
+    let cachedSp500Set = null;
+    let currentGainers = Array.of();
+    let currentLosers = Array.of();
+
+    const sortState = {
+      gainers: { key: "percentChange", dir: "desc" },
+      losers: { key: "percentChange", dir: "asc" }
+    };
 
     function updateKeyVisibility() {
       const hasKey = Boolean(fmpKeyInput.value.trim());
@@ -183,8 +205,10 @@
       fmpKeyInput.focus();
     });
 
+    marketFilter.addEventListener("change", fetchLiveMovers);
+
     function parseNum(val) {
-      if (typeof val === "number") return val;
+      if (typeof val === "number") return isNaN(val) ? 0 : val;
       if (!val) return 0;
       return Number(String(val).replace(/[$,%+()]/g, "").replace(/,/g, "")) || 0;
     }
@@ -198,13 +222,54 @@
       return n.toLocaleString("en-US");
     }
 
-    function renderRows(tbody, list, isGainer, afterHoursMap) {
-      if (!list || list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="color: var(--muted);">No stocks $5.00+ returned.</td></tr>';
+    function isAllowedExchange(exch) {
+      if (!exch) return true;
+      const upper = String(exch).toUpperCase();
+      return upper.includes("NYSE") || upper.includes("NASDAQ");
+    }
+
+    function sortList(list, key, dir) {
+      const mult = dir === "asc" ? 1 : -1;
+      return list.slice().sort((a, b) => {
+        if (key === "symbol" || key === "name") {
+          return String(a[key] || "").localeCompare(String(b[key] || "")) * mult;
+        }
+        return (parseNum(a[key]) - parseNum(b[key])) * mult;
+      });
+    }
+
+    function updateHeaderIndicators(headerRowId, activeKey, dir) {
+      const row = document.getElementById(headerRowId);
+      if (!row) return;
+      row.querySelectorAll("th.sortable").forEach(th => {
+        const ind = th.querySelector(".sort-ind");
+        if (th.dataset.key === activeKey) {
+          th.classList.add("active-sort");
+          if (ind) ind.textContent = dir === "asc" ? "▲" : "▼";
+        } else {
+          th.classList.remove("active-sort");
+          if (ind) ind.textContent = "";
+        }
+      });
+    }
+
+    function renderTable(side) {
+      const isGainer = side === "gainers";
+      const tbody = isGainer ? gainersBody : losersBody;
+      const rawList = isGainer ? currentGainers : currentLosers;
+      const state = sortState[side];
+      const headerId = isGainer ? "gainersHeader" : "losersHeader";
+
+      updateHeaderIndicators(headerId, state.key, state.dir);
+
+      if (!rawList || rawList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="color: var(--muted);">No matching stocks $5.00+ found.</td></tr>';
         return;
       }
 
-      tbody.innerHTML = list.slice(0, MAX_ITEMS).map((item, i) => {
+      const sorted = sortList(rawList, state.key, state.dir);
+
+      tbody.innerHTML = sorted.slice(0, MAX_ITEMS).map((item, i) => {
         const priceNum = parseNum(item.price);
         const priceStr = priceNum.toFixed(2);
         const chg = parseNum(item.change);
@@ -212,19 +277,19 @@
         const chgStr = (chg >= 0 ? "+" : "") + chg.toFixed(2);
         const pctStr = (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%";
         const pillClass = isGainer ? "pill-gain" : "pill-loss";
+        const exchBadge = item.exchange ? `<span class="exch-tag">${item.exchange}</span>` : "";
 
-        const ahPrice = afterHoursMap.get(item.symbol);
         let ahDisplay = "--";
-        if (ahPrice && ahPrice > 0) {
-          const ahDiffPct = ((ahPrice - priceNum) / priceNum) * 100;
+        if (item.afterHours > 0 && Math.abs(item.afterHours - priceNum) > 0.001) {
+          const ahDiffPct = ((item.afterHours - priceNum) / priceNum) * 100;
           const sign = ahDiffPct >= 0 ? "+" : "";
-          ahDisplay = `$${ahPrice.toFixed(2)} (${sign}${ahDiffPct.toFixed(1)}%)`;
+          ahDisplay = `$${item.afterHours.toFixed(2)} (${sign}${ahDiffPct.toFixed(1)}%)`;
         }
 
         return `
           <tr>
             <td class="rank">${i + 1}</td>
-            <td class="ticker">${item.symbol}</td>
+            <td><span class="ticker">${item.symbol}</span>${exchBadge}</td>
             <td class="company" title="${item.name || ""}">${item.name || "-"}</td>
             <td class="num">$${priceStr}</td>
             <td class="num after-hrs">${ahDisplay}</td>
@@ -236,28 +301,76 @@
       }).join("");
     }
 
+    function bindHeaderSorting(headerRowId, side) {
+      const row = document.getElementById(headerRowId);
+      if (!row) return;
+      row.querySelectorAll("th.sortable").forEach(th => {
+        th.addEventListener("click", () => {
+          const key = th.dataset.key;
+          const state = sortState[side];
+          if (state.key === key) {
+            state.dir = state.dir === "asc" ? "desc" : "asc";
+          } else {
+            state.key = key;
+            state.dir = (key === "symbol" || key === "name") ? "asc" : "desc";
+          }
+          renderTable(side);
+        });
+      });
+    }
+
+    bindHeaderSorting("gainersHeader", "gainers");
+    bindHeaderSorting("losersHeader", "losers");
+    async function getSp500Symbols(key) {
+      if (cachedSp500Set) return cachedSp500Set;
+      try {
+        const base = "https://financialmodelingprep.com";
+        const res = await fetch(base + "/stable/sp500-constituent?apikey=" + encodeURIComponent(key));
+        if (res.ok) {
+          const list = await res.json();
+          if (Array.isArray(list) && list.length > 0) {
+            cachedSp500Set = new Set(list.map(x => String(x.symbol).toUpperCase()));
+            return cachedSp500Set;
+          }
+        }
+      } catch (e) {}
+      return null;
+    }
+
     async function fetchAfterHoursMap(symbols, key) {
       const map = new Map();
       if (!symbols.length) return map;
+      const base = "https://financialmodelingprep.com";
+      const joined = encodeURIComponent(symbols.join(","));
 
       try {
-        const base = "https://financialmodelingprep.com";
-        const joined = encodeURIComponent(symbols.join(","));
-        const res = await fetch(base + "/stable/batch-aftermarket-quote?symbols=" + joined + "&apikey=" + encodeURIComponent(key));
-        if (!res.ok) return map;
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          for (const entry of data) {
-            const sym = entry.symbol;
-            const extPrice = parseNum(entry.afterHoursPrice || entry.price || entry.bid || entry.ask);
-            if (sym && extPrice > 0) {
-              map.set(sym, extPrice);
+        const qRes = await fetch(base + "/stable/batch-quote?symbols=" + joined + "&apikey=" + encodeURIComponent(key));
+        if (qRes.ok) {
+          const qData = await qRes.json();
+          if (Array.isArray(qData)) {
+            for (const entry of qData) {
+              const ext = parseNum(entry.postMarketPrice || entry.preMarketPrice || entry.afterHoursPrice);
+              if (entry.symbol && ext > 0) map.set(entry.symbol, ext);
             }
           }
         }
-      } catch (e) {
-        // Silently ignore if aftermarket endpoint is unavailable on current FMP tier
+      } catch (e) {}
+
+      if (map.size === 0) {
+        try {
+          const ahRes = await fetch(base + "/stable/batch-aftermarket-quote?symbols=" + joined + "&apikey=" + encodeURIComponent(key));
+          if (ahRes.ok) {
+            const ahData = await ahRes.json();
+            if (Array.isArray(ahData)) {
+              for (const entry of ahData) {
+                const ext = parseNum(entry.afterHoursPrice || entry.bid || entry.ask);
+                if (entry.symbol && ext > 0) map.set(entry.symbol, ext);
+              }
+            }
+          }
+        } catch (e) {}
       }
+
       return map;
     }
 
@@ -274,10 +387,13 @@
 
       localStorage.setItem("fmp_api_key", key);
       updateKeyVisibility();
-      statusText.textContent = "Fetching Top 50 US market movers ($5.00+)...";
+      statusText.textContent = "Fetching live NYSE, NASDAQ & S&P 500 movers ($5.00+)...";
 
       try {
         const base = "https://financialmodelingprep.com";
+        const useSp500Only = marketFilter.value === "sp500";
+        const sp500Set = useSp500Only ? await getSp500Symbols(key) : null;
+
         const pair = await Promise.all(Array.of(
           fetch(base + "/stable/biggest-gainers?apikey=" + encodeURIComponent(key)),
           fetch(base + "/stable/biggest-losers?apikey=" + encodeURIComponent(key))
@@ -292,29 +408,43 @@
 
         const filterAndMap = arr => (Array.isArray(arr) ? arr : Array.of())
           .map(item => ({
-            symbol: item.symbol,
+            symbol: String(item.symbol || "").toUpperCase(),
             name: item.name,
+            exchange: item.exchangeShortName || item.exchange || "",
             price: parseNum(item.price),
+            afterHours: 0,
             change: parseNum(item.change),
             percentChange: parseNum(item.changesPercentage),
-            volume: item.volume || 0
+            volume: parseNum(item.volume)
           }))
-          .filter(item => item.price >= MIN_PRICE)
+          .filter(item => {
+            if (item.price < MIN_PRICE) return false;
+            if (!isAllowedExchange(item.exchange)) return false;
+            if (useSp500Only && sp500Set && !sp500Set.has(item.symbol)) return false;
+            return true;
+          })
           .slice(0, MAX_ITEMS);
 
-        const gainers = filterAndMap(gJson);
-        const losers = filterAndMap(lJson);
+        currentGainers = filterAndMap(gJson);
+        currentLosers = filterAndMap(lJson);
 
         const allSymbols = Array.from(new Set(
-          gainers.map(x => x.symbol).concat(losers.map(x => x.symbol))
+          currentGainers.map(x => x.symbol).concat(currentLosers.map(x => x.symbol))
         ));
         const afterHoursMap = await fetchAfterHoursMap(allSymbols, key);
 
-        renderRows(gainersBody, gainers, true, afterHoursMap);
-        renderRows(losersBody, losers, false, afterHoursMap);
+        currentGainers.forEach(item => {
+          item.afterHours = afterHoursMap.get(item.symbol) || 0;
+        });
+        currentLosers.forEach(item => {
+          item.afterHours = afterHoursMap.get(item.symbol) || 0;
+        });
 
-        const ahNote = afterHoursMap.size > 0 ? " + After-Hours Quotes" : "";
-        statusText.textContent = `Live feed: FMP (${gainers.length} Gainers, ${losers.length} Losers >= $5.00${ahNote})`;
+        renderTable("gainers");
+        renderTable("losers");
+
+        const scopeLabel = useSp500Only ? "S&P 500 Only" : "NYSE + NASDAQ (incl. S&P 500)";
+        statusText.textContent = `Live feed: ${scopeLabel} — ${currentGainers.length} Gainers, ${currentLosers.length} Losers ($5.00+)`;
       } catch (err) {
         statusText.textContent = "Feed error: " + err.message;
         gainersBody.innerHTML = '<tr><td colspan="8" style="color: var(--red);">Unable to load: ' + err.message + '</td></tr>';
