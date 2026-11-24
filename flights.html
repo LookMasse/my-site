@@ -145,17 +145,17 @@
       </table>
     </section>
   </main>
-  <script>
+   <script>
     const refreshBtn = document.getElementById("refreshBtn");
     const arrivalsBody = document.getElementById("arrivalsBody");
     const departuresBody = document.getElementById("departuresBody");
     const statusText = document.getElementById("statusText");
     const lastUpdated = document.getElementById("lastUpdated");
 
-    // 40 nautical miles (~74 km) radius around Alicante-Elche Airport (38.2822 N, -0.5582 W)
-    const RADAR_ENDPOINTS = Array.of(
-      "https://adsb.lol",
-      "https://airplanes.live"
+    const RADAR_PATH = "/v2/point/38.2822/-0.5582/40";
+    const RADAR_HOSTS = Array.of(
+      "https://api.adsb.lol",
+      "https://api.airplanes.live"
     );
 
     function showMessage(tbody, text) {
@@ -211,9 +211,9 @@
 
     async function fetchRadarJson() {
       let lastErr;
-      for (const url of RADAR_ENDPOINTS) {
+      for (const host of RADAR_HOSTS) {
         try {
-          const res = await fetch(url);
+          const res = await fetch(host + RADAR_PATH);
           if (!res.ok) throw new Error("HTTP " + res.status);
           const data = await res.json();
           if (data && Array.isArray(data.ac)) return data.ac;
@@ -223,7 +223,6 @@
       }
       throw lastErr || new Error("Radar endpoints unavailable");
     }
-
     async function fetchAlicanteRadar() {
       const now = new Date();
       statusText.textContent = "Scanning live aircraft around Alicante (ALC / LEAL)...";
