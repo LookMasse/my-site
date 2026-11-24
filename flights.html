@@ -152,8 +152,11 @@
     const statusText = document.getElementById("statusText");
     const lastUpdated = document.getElementById("lastUpdated");
 
-    // Bounding box ~70 km around Alicante-Elche Airport (38.2822 N, -0.5582 W)
-    const OPENSKY_URL = "https://opensky-network.org";
+    // 40 nautical miles (~74 km) radius around Alicante-Elche Airport (38.2822 N, -0.5582 W)
+    const RADAR_ENDPOINTS = Array.of(
+      "https://adsb.lol",
+      "https://airplanes.live"
+    );
 
     function showMessage(tbody, text) {
       tbody.innerHTML = "";
@@ -180,8 +183,8 @@
         tdCall.className = "flight-num";
         tdCall.textContent = ac.callsign;
 
-        const tdCountry = document.createElement("td");
-        tdCountry.textContent = ac.country;
+        const tdType = document.createElement("td");
+        tdType.textContent = ac.aircraftType;
 
         const tdAlt = document.createElement("td");
         tdAlt.className = "mono";
@@ -198,7 +201,7 @@
         tdPhase.appendChild(pill);
 
         tr.appendChild(tdCall);
-        tr.appendChild(tdCountry);
+        tr.appendChild(tdType);
         tr.appendChild(tdAlt);
         tr.appendChild(tdSpd);
         tr.appendChild(tdPhase);
@@ -206,51 +209,65 @@
       });
     }
 
+    async function fetchRadarJson() {
+      let lastErr;
+      for (const url of RADAR_ENDPOINTS) {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const data = await res.json();
+          if (data && Array.isArray(data.ac)) return data.ac;
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+      throw lastErr || new Error("Radar endpoints unavailable");
+    }
+
     async function fetchAlicanteRadar() {
       const now = new Date();
       statusText.textContent = "Scanning live aircraft around Alicante (ALC / LEAL)...";
 
       try {
-        const res = await fetch(OPENSKY_URL);
-        if (!res.ok) throw new Error("OpenSky HTTP " + res.status);
-        const data = await res.json();
-        const states = Array.isArray(data.states) ? data.states : Array.of();
+        const rawList = await fetchRadarJson();
 
-        const aircraft = states.map(s => {
-          const callsign = String(s.at(1) || s.at(0) || "N/A").trim();
-          const country = String(s.at(2) || "Unknown");
-          const onGround = Boolean(s.at(8));
-          const velocityMs = Number(s.at(9) || 0);
-          const verticalRate = Number(s.at(11) || 0);
-          const geoAlt = Number(s.at(13) || s.at(7) || 0);
+        const aircraft = rawList.map(ac => {
+          const callsign = String(ac.flight || ac.r || ac.hex || "N/A").trim();
+          const aircraftType = String(ac.t || ac.desc || "Aircraft").trim();
+          const isGround = ac.alt_baro === "ground" || ac.alt_baro === 0;
+          const altFeet = isGround ? 0 : Number(ac.alt_baro || ac.alt_geom || 0);
+          const altMeters = Math.max(0, Math.round(altFeet * 0.3048));
+          const speedKnots = Number(ac.gs || 0);
+          const speedKmh = Math.round(speedKnots * 1.852);
+          const vertRateFpm = Number(ac.baro_rate || ac.geom_rate || 0);
 
           let phase = "Cruising";
           let pillClass = "pill-level";
-          if (onGround) {
+          if (isGround) {
             phase = "Taxi / Gate";
             pillClass = "pill-desc";
-          } else if (verticalRate < -1.5) {
+          } else if (vertRateFpm < -300) {
             phase = "Descending";
             pillClass = "pill-desc";
-          } else if (verticalRate > 1.5) {
+          } else if (vertRateFpm > 300) {
             phase = "Climbing";
             pillClass = "pill-climb";
           }
 
           return {
             callsign: callsign,
-            country: country,
-            onGround: onGround,
-            altMeters: Math.max(0, Math.round(geoAlt)),
-            speedKmh: Math.round(velocityMs * 3.6),
-            verticalRate: verticalRate,
+            aircraftType: aircraftType,
+            onGround: isGround,
+            altMeters: altMeters,
+            speedKmh: speedKmh,
+            vertRateFpm: vertRateFpm,
             phase: phase,
             pillClass: pillClass
           };
         }).filter(ac => ac.callsign && ac.callsign !== "N/A");
 
         const approaching = aircraft
-          .filter(ac => ac.onGround || ac.verticalRate < -1.0 || ac.altMeters < 3500)
+          .filter(ac => ac.onGround || ac.vertRateFpm < -250 || ac.altMeters < 3500)
           .sort((a, b) => a.altMeters - b.altMeters);
 
         const departingOrHigh = aircraft
@@ -260,11 +277,11 @@
         renderAircraft(arrivalsBody, approaching, "No low-altitude or descending flights in range right now.");
         renderAircraft(departuresBody, departingOrHigh, "No departing or high-altitude flights in range right now.");
 
-        statusText.textContent = "Live OpenSky Radar: " + aircraft.length + " active aircraft tracked around Alicante (ALC)";
+        statusText.textContent = "Live ADS-B Radar: " + aircraft.length + " active aircraft tracked within 74 km of Alicante (ALC)";
       } catch (err) {
         statusText.textContent = "Radar feed busy: " + err.message + " (Click Update Radar to retry)";
-        showMessage(arrivalsBody, "Unable to reach OpenSky radar right now.");
-        showMessage(departuresBody, "Unable to reach OpenSky radar right now.");
+        showMessage(arrivalsBody, "Unable to reach live radar right now.");
+        showMessage(departuresBody, "Unable to reach live radar right now.");
       }
 
       lastUpdated.textContent = "Last updated: " + now.toLocaleTimeString("es-ES");
