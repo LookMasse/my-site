@@ -382,8 +382,8 @@
     async function safeFetchJson(url) {
       const res = await fetch(url);
       const text = await res.text();
-      if (!res.ok || text.trim().startsWith("Restricted")) {
-        throw new Error(text.trim() || "HTTP " + res.status);
+      if (!res.ok || text.trim().startsWith("Restricted") || text.includes("Limit Reach")) {
+        throw new Error("Daily FMP API limit reached (resets on a rolling 24h window).");
       }
       const data = JSON.parse(text);
       if (data && data["Error Message"]) {
@@ -399,9 +399,14 @@
     function draw7DaySvg(points, isPos) {
       const box = document.getElementById("chartContainer");
       if (!points || points.length < 2) {
-        box.innerHTML = '<div style="color:var(--muted);padding:35px 0;text-align:center;">7-day intraday history unavailable on free key — use Yahoo Finance or TradingView below.</div>';
+        box.textContent = "7-day intraday history unavailable — use Yahoo Finance or TradingView links below.";
+        box.style.color = "var(--muted)";
+        box.style.padding = "35px 0";
+        box.style.textAlign = "center";
         return;
       }
+      box.style.padding = "12px";
+      box.style.textAlign = "left";
       const w = 680, h = 200, padL = 52, padR = 14, padT = 16, padB = 24;
       const vals = points.map(p => p.close);
       const minP = Math.min.apply(null, vals), maxP = Math.max.apply(null, vals);
@@ -416,6 +421,8 @@
         <polyline fill="none" stroke="${color}" stroke-width="2.4" points="${pts}" />
       </svg>`;
     }
+
+    const chartCache = new Map();
 
     async function showStockPopup(sym) {
       const all = currentGainers.concat(currentLosers);
@@ -432,16 +439,30 @@
       document.getElementById("statVol").textContent = formatVol(item.volume);
       document.getElementById("yahooLink").href = "https://yahoo.com" + encodeURIComponent(sym);
       document.getElementById("tvLink").href = "https://tradingview.com" + encodeURIComponent(sym);
-      document.getElementById("chartContainer").innerHTML = '<div style="color:var(--muted);padding:35px 0;text-align:center;">Loading 7-day chart...</div>';
+
+      const box = document.getElementById("chartContainer");
+      box.textContent = "Loading 7-day chart...";
+      box.style.color = "var(--muted)";
+      box.style.padding = "35px 0";
+      box.style.textAlign = "center";
       stockModal.classList.add("open");
+
+      if (chartCache.has(sym)) {
+        const ordered = chartCache.get(sym);
+        const vals = ordered.map(p => p.close);
+        document.getElementById("statRange").textContent = `$${Math.min.apply(null, vals).toFixed(2)} – $${Math.max.apply(null, vals).toFixed(2)}`;
+        draw7DaySvg(ordered, ordered.at(-1).close >= ordered.at(0).close);
+        return;
+      }
 
       try {
         const key = fmpKeyInput.value.trim();
         const from = new Date(Date.now() - 8 * 86400000).toISOString().slice(0, 10);
-        const url = "https://financialmodelingprep.com" + "/stable/historical-chart/1hour?symbol=" + encodeURIComponent(sym) + "&from=" + from + "&apikey=" + encodeURIComponent(key);
+        const url = "https://financialmodelingprep.com" + encodeURIComponent(sym) + "&from=" + from + "&apikey=" + encodeURIComponent(key);
         const raw = await safeFetchJson(url);
         if (Array.isArray(raw) && raw.length >= 2) {
           const ordered = raw.slice().reverse().map(p => ({ close: parseNum(p.close) })).filter(p => p.close > 0);
+          chartCache.set(sym, ordered);
           const vals = ordered.map(p => p.close);
           document.getElementById("statRange").textContent = `$${Math.min.apply(null, vals).toFixed(2)} – $${Math.max.apply(null, vals).toFixed(2)}`;
           draw7DaySvg(ordered, ordered.at(-1).close >= ordered.at(0).close);
@@ -454,7 +475,6 @@
         draw7DaySvg(Array.of(), item.percentChange >= 0);
       }
     }
-
     document.addEventListener("click", e => {
       const tickerEl = e.target.closest(".ticker");
       if (tickerEl) {
@@ -463,18 +483,28 @@
       }
     });
 
+    function showTableMessage(tbody, message, colorVar) {
+      tbody.innerHTML = "";
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 8;
+      td.style.color = colorVar;
+      td.textContent = message;
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
+
     async function fetchNyseNasdaqMovers(key) {
       const base = "https://financialmodelingprep.com";
       const k = encodeURIComponent(key);
+
       const results = await Promise.allSettled(Array.of(
         safeFetchJson(base + "/stable/biggest-gainers?apikey=" + k),
-        safeFetchJson(base + "/stable/biggest-losers?apikey=" + k),
-        safeFetchJson(base + "/stable/most-actives?apikey=" + k)
+        safeFetchJson(base + "/stable/biggest-losers?apikey=" + k)
       ));
 
       const gRes = results.at(0).status === "fulfilled" ? results.at(0).value : Array.of();
       const lRes = results.at(1).status === "fulfilled" ? results.at(1).value : Array.of();
-      const aRes = results.at(2).status === "fulfilled" ? results.at(2).value : Array.of();
 
       if (!gRes.length && !lRes.length) {
         const firstErr = results.at(0).reason || results.at(1).reason;
@@ -505,8 +535,35 @@
 
       addList(gRes);
       addList(lRes);
-      addList(aRes);
       return Array.from(bySymbol.values());
+    }
+
+    function applyPoolToTables(pool, labelPrefix, timeLabel) {
+      const useSp500Only = marketFilter.value === "sp500";
+      const filtered = useSp500Only ? pool.filter(x => SP500_SET.has(x.symbol)) : pool;
+
+      currentGainers = filtered.filter(x => x.percentChange > 0).sort((a, b) => b.percentChange - a.percentChange).slice(0, MAX_ITEMS);
+      currentLosers = filtered.filter(x => x.percentChange < 0).sort((a, b) => a.percentChange - b.percentChange).slice(0, MAX_ITEMS);
+
+      renderTable("gainers");
+      renderTable("losers");
+
+      const scopeLabel = useSp500Only ? "S&P 500 Filter" : "NYSE + NASDAQ (incl. S&P 500)";
+      statusText.textContent = `${labelPrefix}: ${scopeLabel} — ${currentGainers.length} Gainers, ${currentLosers.length} Losers ($5.00+)`;
+      if (timeLabel) lastUpdated.textContent = timeLabel;
+    }
+
+    function loadSavedCache() {
+      try {
+        const raw = localStorage.getItem("fmp_movers_cache");
+        if (!raw) return false;
+        const cached = JSON.parse(raw);
+        if (cached && Array.isArray(cached.pool) && cached.pool.length > 0) {
+          applyPoolToTables(cached.pool, "Saved snapshot (API limit reached)", "Saved from: " + (cached.savedAt || "earlier"));
+          return true;
+        }
+      } catch (e) {}
+      return false;
     }
 
     async function fetchLiveMovers() {
@@ -515,43 +572,33 @@
 
       if (!key) {
         statusText.textContent = "Please paste your Financial Modeling Prep API key above and click Update Quotes.";
-        gainersBody.innerHTML = '<tr><td colspan="8" style="color: var(--muted);">Waiting for API key...</td></tr>';
-        losersBody.innerHTML = '<tr><td colspan="8" style="color: var(--muted);">Waiting for API key...</td></tr>';
+        showTableMessage(gainersBody, "Waiting for API key...", "var(--muted)");
+        showTableMessage(losersBody, "Waiting for API key...", "var(--muted)");
         return;
       }
 
       localStorage.setItem("fmp_api_key", key);
       updateKeyVisibility();
-
-      const useSp500Only = marketFilter.value === "sp500";
-      statusText.textContent = "Fetching live US market movers ($5.00+)...";
+      statusText.textContent = "Fetching live US market movers (2 API calls)...";
 
       try {
-        let pool = await fetchNyseNasdaqMovers(key);
-        if (useSp500Only) {
-          pool = pool.filter(x => SP500_SET.has(x.symbol));
-        }
-
-        currentGainers = pool.filter(x => x.percentChange > 0).sort((a, b) => b.percentChange - a.percentChange).slice(0, MAX_ITEMS);
-        currentLosers = pool.filter(x => x.percentChange < 0).sort((a, b) => a.percentChange - b.percentChange).slice(0, MAX_ITEMS);
-
-        renderTable("gainers");
-        renderTable("losers");
-
-        const scopeLabel = useSp500Only ? "S&P 500 Filter" : "NYSE + NASDAQ (incl. S&P 500)";
-        statusText.textContent = `Live feed: ${scopeLabel} — ${currentGainers.length} Gainers, ${currentLosers.length} Losers ($5.00+)`;
+        const pool = await fetchNyseNasdaqMovers(key);
+        const timeStr = now.toLocaleTimeString();
+        localStorage.setItem("fmp_movers_cache", JSON.stringify({ pool: pool, savedAt: timeStr }));
+        applyPoolToTables(pool, "Live feed", "Last updated: " + timeStr);
       } catch (err) {
-        statusText.textContent = "Feed error: " + err.message;
-        gainersBody.innerHTML = '<tr><td colspan="8" style="color: var(--red);">Unable to load: ' + err.message + '</td></tr>';
-        losersBody.innerHTML = '<tr><td colspan="8" style="color: var(--red);">Unable to load: ' + err.message + '</td></tr>';
+        const hasCache = loadSavedCache();
+        if (!hasCache) {
+          statusText.textContent = "Feed error: " + err.message;
+          showTableMessage(gainersBody, "Unable to load: " + err.message, "var(--red)");
+          showTableMessage(losersBody, "Unable to load: " + err.message, "var(--red)");
+          lastUpdated.textContent = "Last updated: " + now.toLocaleTimeString();
+        }
       }
-
-      lastUpdated.textContent = "Last updated: " + now.toLocaleTimeString();
     }
 
     refreshBtn.addEventListener("click", fetchLiveMovers);
     fetchLiveMovers();
-    setInterval(fetchLiveMovers, REFRESH_MS);
   </script>
 </body>
 </html>
