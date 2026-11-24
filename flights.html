@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Alicante Airport (ALC / LEAL) – Live Keyless Radar &amp; Flights</title>
+  <title>Alicante Airport (ALC / LEAL) – Live Radar &amp; Flights</title>
   <style>
     :root {
       --bg: #090d16;
@@ -13,70 +13,70 @@
       --muted: #9ca3af;
       --accent: #38bdf8;
       --green: #10b981;
-      --amber: #f59e0b;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background-color: var(--bg);
       color: var(--text);
-      padding: 20px;
-      line-height: 1.45;
+      padding: 18px;
+      line-height: 1.4;
     }
     header {
-      max-width: 1360px;
-      margin: 0 auto 18px auto;
+      max-width: 1400px;
+      margin: 0 auto 14px auto;
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
       padding-bottom: 14px;
       border-bottom: 1px solid var(--border);
     }
-    .title-group h1 { font-size: 1.45rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .title-group h1 { font-size: 1.4rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
     .badge-iata {
-      background: var(--accent); color: #090d16; font-size: 0.82rem;
+      background: var(--accent); color: #090d16; font-size: 0.8rem;
       font-weight: 800; padding: 2px 8px; border-radius: 4px;
     }
-    .subtitle { color: var(--muted); font-size: 0.86rem; margin-top: 4px; }
+    .subtitle { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
     .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
     a.nav-btn {
       color: var(--text); text-decoration: none; font-size: 0.85rem;
-      padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px;
-      background: var(--card);
+      padding: 8px 13px; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--card); font-weight: 600;
     }
     a.nav-btn:hover { border-color: var(--accent); color: var(--accent); }
-    button {
-      background: var(--accent); color: #090d16; border: none;
-      padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 0.88rem; cursor: pointer;
+    a.primary-btn {
+      background: var(--accent); color: #090d16; border-color: var(--accent);
     }
-    button:hover { opacity: 0.9; }
-    .status-bar {
-      max-width: 1360px; margin: 0 auto 18px auto; font-size: 0.83rem; color: var(--muted);
-      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    a.primary-btn:hover { opacity: 0.9; color: #090d16; }
+    .radar-card {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
     }
-    .grid { max-width: 1360px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-    @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
-    .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; }
-    .panel-header {
-      padding: 14px 18px; background: rgba(9, 13, 22, 0.6); border-bottom: 1px solid var(--border);
-      display: flex; justify-content: space-between; align-items: center;
+    .radar-bar {
+      padding: 10px 16px;
+      background: rgba(9, 13, 22, 0.7);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
     }
-    .panel-header h2 { font-size: 1.05rem; font-weight: 600; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-    th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
-    th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
-    tr:last-child td { border-bottom: none; }
-    .flight-num { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: var(--accent); }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; }
-    .pill {
-      display: inline-block; padding: 2px 8px; border-radius: 999px;
-      font-size: 0.75rem; font-weight: 600;
+    iframe {
+      width: 100%;
+      height: 75vh;
+      min-height: 540px;
+      border: none;
+      display: block;
     }
-    .pill-desc { background: rgba(16, 185, 129, 0.15); color: var(--green); }
-    .pill-climb { background: rgba(56, 189, 248, 0.15); color: var(--accent); }
-    .pill-level { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
   </style>
 </head>
 <body>
@@ -84,217 +84,30 @@
   <header>
     <div class="title-group">
       <h1>
-        <span>Alicante–Elche Live Airspace</span>
+        <span class="live-dot"></span>
+        <span>Alicante–Elche Live Flight Radar</span>
         <span class="badge-iata">ALC / LEAL</span>
       </h1>
-      <div class="subtitle">Keyless Live Radar Feed via OpenSky Network (No API Key • Unlimited Checks)</div>
+      <div class="subtitle">Real-time aircraft positions, callsigns, altitudes &amp; routes around Alicante (Keyless)</div>
     </div>
 
     <div class="controls">
       <a class="nav-btn" href="index.html">&larr; Menu</a>
-      <a class="nav-btn" href="https://aena.es" target="_blank" rel="noopener">Official Aena Schedule &#8599;</a>
-      <button id="refreshBtn">Update Radar</button>
+      <a class="nav-btn primary-btn" href="https://aena.es" target="_blank" rel="noopener">Official Aena Arrivals/Departures &#8599;</a>
     </div>
   </header>
 
-  <div class="status-bar">
-    <span id="statusText">Connecting to OpenSky live radar around Alicante...</span>
-    <span id="lastUpdated">Last updated: --:--:--</span>
-  </div>
-
-  <main class="grid">
-    <section class="panel">
-      <div class="panel-header">
-        <h2 style="color: var(--green);">Approaching / Descending (Next 10)</h2>
-        <span style="color: var(--muted); font-size: 0.8rem;">Within ~70 km of ALC</span>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Callsign</th>
-            <th>Country</th>
-            <th>Altitude</th>
-            <th>Speed</th>
-            <th>Phase</th>
-          </tr>
-        </thead>
-        <tbody id="arrivalsBody">
-          <tr><td colspan="5">Scanning airspace...</td></tr>
-        </tbody>
-      </table>
-    </section>
-
-    <section class="panel">
-      <div class="panel-header">
-        <h2 style="color: var(--accent);">Departing / Climbing &amp; Overflights (10)</h2>
-        <span style="color: var(--muted); font-size: 0.8rem;">Within ~70 km of ALC</span>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Callsign</th>
-            <th>Country</th>
-            <th>Altitude</th>
-            <th>Speed</th>
-            <th>Phase</th>
-          </tr>
-        </thead>
-        <tbody id="departuresBody">
-          <tr><td colspan="5">Scanning airspace...</td></tr>
-        </tbody>
-      </table>
-    </section>
+  <main class="radar-card">
+    <div class="radar-bar">
+      <span>Tip: Tap any aircraft icon on the map to see its flight number, origin/destination, speed, and altitude.</span>
+      <span>Live ADS-B Stream (No API Key)</span>
+    </div>
+    <iframe
+      src="https://adsbexchange.com"
+      title="Alicante Live Flight Radar"
+      loading="lazy">
+    </iframe>
   </main>
-   <script>
-    const refreshBtn = document.getElementById("refreshBtn");
-    const arrivalsBody = document.getElementById("arrivalsBody");
-    const departuresBody = document.getElementById("departuresBody");
-    const statusText = document.getElementById("statusText");
-    const lastUpdated = document.getElementById("lastUpdated");
 
-    const RADAR_PATH = "/v2/point/38.2822/-0.5582/40";
-    const RADAR_HOSTS = Array.of(
-      "https://api.adsb.lol",
-      "https://api.airplanes.live"
-    );
-
-    function showMessage(tbody, text) {
-      tbody.innerHTML = "";
-      const tr = document.createElement("tr");
-      const td = document.createElement("td");
-      td.colSpan = 5;
-      td.style.color = "var(--muted)";
-      td.textContent = text;
-      tr.appendChild(td);
-      tbody.appendChild(tr);
-    }
-
-    function renderAircraft(tbody, list, emptyMsg) {
-      tbody.innerHTML = "";
-      if (!list || list.length === 0) {
-        showMessage(tbody, emptyMsg);
-        return;
-      }
-
-      list.slice(0, 10).forEach(ac => {
-        const tr = document.createElement("tr");
-
-        const tdCall = document.createElement("td");
-        tdCall.className = "flight-num";
-        tdCall.textContent = ac.callsign;
-
-        const tdType = document.createElement("td");
-        tdType.textContent = ac.aircraftType;
-
-        const tdAlt = document.createElement("td");
-        tdAlt.className = "mono";
-        tdAlt.textContent = ac.onGround ? "On Ground" : ac.altMeters + " m";
-
-        const tdSpd = document.createElement("td");
-        tdSpd.className = "mono";
-        tdSpd.textContent = ac.speedKmh + " km/h";
-
-        const tdPhase = document.createElement("td");
-        const pill = document.createElement("span");
-        pill.className = "pill " + ac.pillClass;
-        pill.textContent = ac.phase;
-        tdPhase.appendChild(pill);
-
-        tr.appendChild(tdCall);
-        tr.appendChild(tdType);
-        tr.appendChild(tdAlt);
-        tr.appendChild(tdSpd);
-        tr.appendChild(tdPhase);
-        tbody.appendChild(tr);
-      });
-    }
-
-    async function fetchRadarJson() {
-      let lastErr;
-      for (const host of RADAR_HOSTS) {
-        const targetUrl = host + RADAR_PATH;
-        const bridges = Array.of(
-          "https://codetabs.com" + "/v1/proxy?quest=" + encodeURIComponent(targetUrl),
-          "https://allorigins.win" + "/raw?url=" + encodeURIComponent(targetUrl)
-        );
-        for (const bridgeUrl of bridges) {
-          try {
-            const res = await fetch(bridgeUrl);
-            if (!res.ok) throw new Error("HTTP " + res.status);
-            const data = await res.json();
-            if (data && Array.isArray(data.ac)) return data.ac;
-          } catch (err) {
-            lastErr = err;
-          }
-        }
-      }
-      throw lastErr || new Error("Radar endpoints unavailable");
-    }
-    async function fetchAlicanteRadar() {
-      const now = new Date();
-      statusText.textContent = "Scanning live aircraft around Alicante (ALC / LEAL)...";
-
-      try {
-        const rawList = await fetchRadarJson();
-
-        const aircraft = rawList.map(ac => {
-          const callsign = String(ac.flight || ac.r || ac.hex || "N/A").trim();
-          const aircraftType = String(ac.t || ac.desc || "Aircraft").trim();
-          const isGround = ac.alt_baro === "ground" || ac.alt_baro === 0;
-          const altFeet = isGround ? 0 : Number(ac.alt_baro || ac.alt_geom || 0);
-          const altMeters = Math.max(0, Math.round(altFeet * 0.3048));
-          const speedKnots = Number(ac.gs || 0);
-          const speedKmh = Math.round(speedKnots * 1.852);
-          const vertRateFpm = Number(ac.baro_rate || ac.geom_rate || 0);
-
-          let phase = "Cruising";
-          let pillClass = "pill-level";
-          if (isGround) {
-            phase = "Taxi / Gate";
-            pillClass = "pill-desc";
-          } else if (vertRateFpm < -300) {
-            phase = "Descending";
-            pillClass = "pill-desc";
-          } else if (vertRateFpm > 300) {
-            phase = "Climbing";
-            pillClass = "pill-climb";
-          }
-
-          return {
-            callsign: callsign,
-            aircraftType: aircraftType,
-            onGround: isGround,
-            altMeters: altMeters,
-            speedKmh: speedKmh,
-            vertRateFpm: vertRateFpm,
-            phase: phase,
-            pillClass: pillClass
-          };
-        }).filter(ac => ac.callsign && ac.callsign !== "N/A");
-
-        const approaching = aircraft
-          .filter(ac => ac.onGround || ac.vertRateFpm < -250 || ac.altMeters < 3500)
-          .sort((a, b) => a.altMeters - b.altMeters);
-
-        const departingOrHigh = aircraft
-          .filter(ac => !approaching.includes(ac))
-          .sort((a, b) => a.altMeters - b.altMeters);
-
-        renderAircraft(arrivalsBody, approaching, "No low-altitude or descending flights in range right now.");
-        renderAircraft(departuresBody, departingOrHigh, "No departing or high-altitude flights in range right now.");
-
-        statusText.textContent = "Live ADS-B Radar: " + aircraft.length + " active aircraft tracked within 74 km of Alicante (ALC)";
-      } catch (err) {
-        statusText.textContent = "Radar feed busy: " + err.message + " (Click Update Radar to retry)";
-        showMessage(arrivalsBody, "Unable to reach live radar right now.");
-        showMessage(departuresBody, "Unable to reach live radar right now.");
-      }
-
-      lastUpdated.textContent = "Last updated: " + now.toLocaleTimeString("es-ES");
-    }
-
-    refreshBtn.addEventListener("click", fetchAlicanteRadar);
-    fetchAlicanteRadar();
-  </script>
 </body>
 </html>
