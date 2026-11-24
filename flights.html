@@ -212,16 +212,20 @@
     async function fetchRadarJson() {
       let lastErr;
       for (const host of RADAR_HOSTS) {
-        try {
-          const targetUrl = host + RADAR_PATH + "?_t=" + Date.now();
-          const bridgeUrl = "https://allorigins.win" + "/get?url=" + encodeURIComponent(targetUrl);
-          const res = await fetch(bridgeUrl);
-          if (!res.ok) throw new Error("Bridge HTTP " + res.status);
-          const wrapper = await res.json();
-          const data = typeof wrapper.contents === "string" ? JSON.parse(wrapper.contents) : wrapper;
-          if (data && Array.isArray(data.ac)) return data.ac;
-        } catch (err) {
-          lastErr = err;
+        const targetUrl = host + RADAR_PATH;
+        const bridges = Array.of(
+          "https://codetabs.com" + "/v1/proxy?quest=" + encodeURIComponent(targetUrl),
+          "https://allorigins.win" + "/raw?url=" + encodeURIComponent(targetUrl)
+        );
+        for (const bridgeUrl of bridges) {
+          try {
+            const res = await fetch(bridgeUrl);
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            const data = await res.json();
+            if (data && Array.isArray(data.ac)) return data.ac;
+          } catch (err) {
+            lastErr = err;
+          }
         }
       }
       throw lastErr || new Error("Radar endpoints unavailable");
