@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alicante Airport (ALC) – Live Arrivals &amp; Departures</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card: #111827;
+      --border: #1f2937;
+      --text: #f9fafb;
+      --muted: #9ca3af;
+      --accent: #38bdf8;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 20px;
+      line-height: 1.45;
+    }
+    header {
+      max-width: 1360px;
+      margin: 0 auto 18px auto;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .title-group h1 { font-size: 1.45rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .badge-iata {
+      background: var(--accent); color: #090d16; font-size: 0.82rem;
+      font-weight: 800; padding: 2px 8px; border-radius: 4px;
+    }
+    .subtitle { color: var(--muted); font-size: 0.86rem; margin-top: 4px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    a.back-link {
+      color: var(--muted); text-decoration: none; font-size: 0.86rem;
+      padding: 7px 12px; border: 1px solid var(--border); border-radius: 6px;
+    }
+    a.back-link:hover { color: var(--text); border-color: var(--accent); }
+    input {
+      background: var(--card); border: 1px solid var(--border); color: var(--text);
+      padding: 8px 12px; border-radius: 6px; font-size: 0.88rem; width: 230px;
+    }
+    button {
+      background: var(--accent); color: #090d16; border: none;
+      padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 0.88rem; cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+    button.secondary { background: var(--card); color: var(--muted); border: 1px solid var(--border); }
+    button.secondary:hover { color: var(--text); }
+    .status-bar {
+      max-width: 1360px; margin: 0 auto 18px auto; font-size: 0.83rem; color: var(--muted);
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    }
+    .grid { max-width: 1360px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+    @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; }
+    .panel-header {
+      padding: 14px 18px; background: rgba(9, 13, 22, 0.6); border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .panel-header h2 { font-size: 1.05rem; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    tr:last-child td { border-bottom: none; }
+    .flight-num { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: var(--accent); }
+    .time { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; }
+    .status-pill {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 0.75rem; font-weight: 600; text-transform: capitalize;
+    }
+    .status-scheduled, .status-active { background: rgba(16, 185, 129, 0.15); color: var(--green); }
+    .status-delayed { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
+    .status-cancelled { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="title-group">
+      <h1>
+        <span>Alicante–Elche Airport</span>
+        <span class="badge-iata">ALC</span>
+      </h1>
+      <div class="subtitle">Next 10 Arrivals &amp; Next 10 Departures (Updates on open &amp; manual click)</div>
+    </div>
+
+    <div class="controls">
+      <a class="back-link" href="index.html">&larr; Menu</a>
+      <input type="password" id="apiKeyInput" placeholder="Aviationstack API Key..." />
+      <button id="toggleKeyBtn" class="secondary" style="display:none;">Change Key</button>
+      <button id="refreshBtn">Update Flights</button>
+    </div>
+  </header>
+
+  <div class="status-bar">
+    <span id="dataSourceLabel">Mode: Demo Data (enter an Aviationstack key for live flights)</span>
+    <span id="lastUpdated">Last updated: --:--:--</span>
+  </div>
+
+  <main class="grid">
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Arrivals (Next 10)</h2>
+        <span style="color: var(--muted); font-size: 0.8rem;">Local Time (CET)</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Flight</th>
+            <th>Origin</th>
+            <th>Airline</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="arrivalsBody">
+          <tr><td colspan="5">Loading arrivals...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Departures (Next 10)</h2>
+        <span style="color: var(--muted); font-size: 0.8rem;">Local Time (CET)</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Flight</th>
+            <th>Destination</th>
+            <th>Airline</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="departuresBody">
+          <tr><td colspan="5">Loading departures...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+  <script>
+    const AIRPORT_IATA = "ALC";
+    const apiKeyInput = document.getElementById("apiKeyInput");
+    const toggleKeyBtn = document.getElementById("toggleKeyBtn");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const arrivalsBody = document.getElementById("arrivalsBody");
+    const departuresBody = document.getElementById("departuresBody");
+    const dataSourceLabel = document.getElementById("dataSourceLabel");
+    const lastUpdatedLabel = document.getElementById("lastUpdated");
+
+    function updateKeyVisibility() {
+      const hasKey = Boolean(apiKeyInput.value.trim());
+      apiKeyInput.style.display = hasKey ? "none" : "inline-block";
+      toggleKeyBtn.style.display = hasKey ? "inline-block" : "none";
+    }
+
+    const savedKey = localStorage.getItem("alc_aviationstack_key");
+    if (savedKey) apiKeyInput.value = savedKey;
+    updateKeyVisibility();
+
+    toggleKeyBtn.addEventListener("click", () => {
+      apiKeyInput.style.display = "inline-block";
+      toggleKeyBtn.style.display = "none";
+      apiKeyInput.focus();
+    });
+
+    function formatTime(isoString) {
+      if (!isoString) return "--:--";
+      const date = new Date(isoString);
+      return date.toLocaleTimeString("es-ES", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Europe/Madrid"
+      });
+    }
+
+    function getStatusClass(status) {
+      const s = (status || "scheduled").toLowerCase();
+      if (s.includes("cancel")) return "status-cancelled";
+      if (s.includes("delay")) return "status-delayed";
+      return "status-scheduled";
+    }
+
+    function renderRows(tbody, flights, type) {
+      tbody.innerHTML = "";
+      if (!flights || flights.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 5;
+        td.style.color = "var(--muted)";
+        td.textContent = "No upcoming flights found.";
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+
+      flights.slice(0, 10).forEach(f => {
+        const timeIso = type === "arrival"
+          ? (f.arrival.estimated || f.arrival.scheduled)
+          : (f.departure.estimated || f.departure.scheduled);
+
+        const city = type === "arrival"
+          ? `${f.departure.airport || "Unknown"} (${f.departure.iata || "---"})`
+          : `${f.arrival.airport || "Unknown"} (${f.arrival.iata || "---"})`;
+
+        const flightCode = (f.flight && (f.flight.iata || f.flight.icao)) || "N/A";
+        const airline = (f.airline && f.airline.name) || "Unknown";
+        const status = f.flight_status || "scheduled";
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="time">${formatTime(timeIso)}</td>
+          <td class="flight-num">${flightCode}</td>
+          <td>${city}</td>
+          <td>${airline}</td>
+          <td><span class="status-pill ${getStatusClass(status)}">${status}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function generateDemoFlights(type) {
+      const now = Date.now();
+      const routes = Array.of(
+        { iata: "LGW", airport: "London Gatwick", airline: "easyJet", code: "U286" },
+        { iata: "MAD", airport: "Madrid Barajas", airline: "Iberia", code: "IB36" },
+        { iata: "MAN", airport: "Manchester", airline: "Ryanair", code: "FR40" },
+        { iata: "AMS", airport: "Amsterdam Schiphol", airline: "Transavia", code: "HV61" },
+        { iata: "BRU", airport: "Brussels", airline: "Brussels Airlines", code: "SN37" },
+        { iata: "OSL", airport: "Oslo Gardermoen", airline: "Norwegian", code: "DY17" },
+        { iata: "BCN", airport: "Barcelona El Prat", airline: "Vueling", code: "VY13" },
+        { iata: "DUB", airport: "Dublin", airline: "Aer Lingus", code: "EI58" },
+        { iata: "FRA", airport: "Frankfurt", airline: "Lufthansa", code: "LH11" },
+        { iata: "ARN", airport: "Stockholm Arlanda", airline: "SAS", code: "SK25" }
+      );
+
+      return routes.map((r, index) => {
+        const flightTime = new Date(now + (index + 1) * 14 * 60000).toISOString();
+        return {
+          flight_status: index === 3 ? "delayed" : "scheduled",
+          airline: { name: r.airline },
+          flight: { iata: `${r.code}${10 + index}` },
+          departure: type === "arrival"
+            ? { airport: r.airport, iata: r.iata, scheduled: flightTime }
+            : { airport: "Alicante", iata: "ALC", scheduled: flightTime },
+          arrival: type === "arrival"
+            ? { airport: "Alicante", iata: "ALC", scheduled: flightTime }
+            : { airport: r.airport, iata: r.iata, scheduled: flightTime }
+        };
+      });
+    }
+
+    async function fetchAviationstackViaHttps(httpUrl) {
+      const bridge = new URL("https://allorigins.win");
+      bridge.searchParams.set("url", httpUrl);
+      const res = await fetch(bridge.toString());
+      if (!res.ok) throw new Error("Bridge HTTP " + res.status);
+      const wrapper = await res.json();
+      return typeof wrapper.contents === "string" ? JSON.parse(wrapper.contents) : wrapper;
+    }
+
+    async function fetchFlights() {
+      const apiKey = apiKeyInput.value.trim();
+      const now = new Date();
+
+      if (!apiKey) {
+        dataSourceLabel.textContent = "Mode: Demo Data (paste a free Aviationstack API key above for live ALC feeds)";
+        renderRows(arrivalsBody, generateDemoFlights("arrival"), "arrival");
+        renderRows(departuresBody, generateDemoFlights("departure"), "departure");
+        lastUpdatedLabel.textContent = "Last updated: " + now.toLocaleTimeString("es-ES");
+        return;
+      }
+
+      localStorage.setItem("alc_aviationstack_key", apiKey);
+      updateKeyVisibility();
+      dataSourceLabel.textContent = "Fetching live data for Alicante (ALC)...";
+
+      try {
+        const base = "http://aviationstack.com" + encodeURIComponent(apiKey);
+        const arrUrl = base + "&arr_iata=" + AIRPORT_IATA + "&flight_status=scheduled";
+        const depUrl = base + "&dep_iata=" + AIRPORT_IATA + "&flight_status=scheduled";
+
+        const pair = await Promise.all(Array.of(
+          fetchAviationstackViaHttps(arrUrl),
+          fetchAviationstackViaHttps(depUrl)
+        ));
+
+        const arrJson = pair.at(0);
+        const depJson = pair.at(1);
+
+        if (arrJson.error || depJson.error) {
+          throw new Error((arrJson.error || depJson.error).message || "API Error");
+        }
+
+        const sortUpcoming = (list, key) => {
+          return (Array.isArray(list) ? list : Array.of())
+            .filter(item => item[key] && new Date(item[key].scheduled) >= now)
+            .sort((a, b) => new Date(a[key].scheduled) - new Date(b[key].scheduled))
+            .slice(0, 10);
+        };
+
+        renderRows(arrivalsBody, sortUpcoming(arrJson.data, "arrival"), "arrival");
+        renderRows(departuresBody, sortUpcoming(depJson.data, "departure"), "departure");
+        dataSourceLabel.textContent = "Mode: Live Aviationstack API Feed (ALC)";
+      } catch (err) {
+        dataSourceLabel.textContent = "Live fetch failed (" + err.message + "). Showing fallback data.";
+        renderRows(arrivalsBody, generateDemoFlights("arrival"), "arrival");
+        renderRows(departuresBody, generateDemoFlights("departure"), "departure");
+      }
+
+      lastUpdatedLabel.textContent = "Last updated: " + now.toLocaleTimeString("es-ES");
+    }
+
+    refreshBtn.addEventListener("click", fetchFlights);
+    fetchFlights();
+  </script>
+</body>
+</html>
