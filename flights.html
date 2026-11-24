@@ -213,9 +213,12 @@
       let lastErr;
       for (const host of RADAR_HOSTS) {
         try {
-          const res = await fetch(host + RADAR_PATH);
-          if (!res.ok) throw new Error("HTTP " + res.status);
-          const data = await res.json();
+          const targetUrl = host + RADAR_PATH + "?_t=" + Date.now();
+          const bridgeUrl = "https://allorigins.win" + "/get?url=" + encodeURIComponent(targetUrl);
+          const res = await fetch(bridgeUrl);
+          if (!res.ok) throw new Error("Bridge HTTP " + res.status);
+          const wrapper = await res.json();
+          const data = typeof wrapper.contents === "string" ? JSON.parse(wrapper.contents) : wrapper;
           if (data && Array.isArray(data.ac)) return data.ac;
         } catch (err) {
           lastErr = err;
